@@ -7,12 +7,21 @@ import { RouteResult, DeliveryConstraint, VehicleConstraints } from './types/sim
 import { Navigation } from 'lucide-react';
 import { TelematicsPanel } from './components/TelematicsPanel';
 import { TrainingChart } from './components/TrainingChart';
-import { VoiceAssistant } from './components/VoiceAssistant';
+import { VoiceAssistant } from './components/VoiceAssistant'; // Restored import
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { LoginScreen } from './components/LoginScreen';
 
 const controller = new SimulationController();
 
-function App() {
-  const [, setUpdateTrigger] = useState(0);
+function Dashboard() {
+  const { user, logout } = useAuth();
+
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  // existing state...
+  const [, setUpdateTrigger] = useState(0); // Restored state variable
   const [rlRoute, setRlRoute] = useState<RouteResult | undefined>();
   const [dijkstraRoute, setDijkstraRoute] = useState<RouteResult | undefined>();
   const [activeAlgorithm, setActiveAlgorithm] = useState<'both' | 'rl' | 'dijkstra'>('both');
@@ -67,8 +76,8 @@ function App() {
     }, 50);
   }, []);
 
-  const handleUpdateEnvironment = useCallback(() => {
-    controller.updateEnvironment();
+  const handleUpdateEnvironment = useCallback(async () => {
+    await controller.syncWithRealWorld();
   }, []);
 
   const handleVoiceCommand = useCallback((command: string) => {
@@ -90,13 +99,26 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <Navigation className="w-8 h-8 text-blue-600" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">GreenPath Dynamic Routing</h1>
               <p className="text-sm text-gray-600">Predictive Logistics AI with Reinforcement Learning</p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden md:block">
+              <p className="text-sm font-bold text-gray-800">{user?.name}</p>
+              <p className="text-xs text-blue-600 uppercase font-semibold tracking-wider">{user?.role}</p>
+            </div>
+            <button
+              onClick={logout}
+              className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              Logout
+            </button>
           </div>
         </div>
       </header>
@@ -150,6 +172,8 @@ function App() {
               rainLevel={state.environment.getRainLevel()}
               weatherType={state.environment.getWeatherType()}
               incidentCount={state.environment.getIncidentCount()}
+              onTrafficChange={(val) => controller.setTrafficIntensity(val)}
+              onRainChange={(val) => controller.setRainLevel(val)}
             />
 
             <VoiceAssistant onCommand={handleVoiceCommand} />
@@ -186,4 +210,10 @@ function App() {
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <AuthProvider>
+      <Dashboard />
+    </AuthProvider>
+  );
+}

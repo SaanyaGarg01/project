@@ -73,6 +73,21 @@ export function TelematicsPanel({ vehicle, currentStep, totalDistance, progress 
                     </div>
                 </div>
 
+                {/* Traffic Forecast */}
+                <div className="bg-slate-800 p-3 rounded border border-slate-700">
+                    <span className="text-xs text-slate-400 block mb-1">FORECAST (+15m)</span>
+                    <div className="flex items-center gap-1 mt-1">
+                        {currentStep && currentStep.traffic > 0.7 ? (
+                            <TrendingDown className="w-5 h-5 text-green-500" />
+                        ) : (
+                            <TrendingDown className="w-5 h-5 text-red-500 rotate-180" />
+                        )}
+                        <span className={`text-lg font-bold ${currentStep && currentStep.traffic > 0.7 ? 'text-green-400' : 'text-red-400'}`}>
+                            {currentStep && currentStep.traffic > 0.7 ? 'CLEARING' : 'RISING'}
+                        </span>
+                    </div>
+                </div>
+
                 {/* Hazard Risk */}
                 <div className="bg-slate-800 p-3 rounded border border-slate-700">
                     <span className="text-xs text-slate-400 block mb-1">RISK LEVEL</span>
@@ -93,14 +108,36 @@ export function TelematicsPanel({ vehicle, currentStep, totalDistance, progress 
                     </div>
                 </div>
 
-                {/* AI Insight */}
-                {currentStep?.reason && (
-                    <div className="col-span-2 bg-blue-900/40 p-3 rounded border border-blue-700/50">
-                        <span className="text-xs text-blue-300 block mb-1 uppercase tracking-wider">AI Insight</span>
-                        <p className="text-sm text-blue-100 italic">"{currentStep.reason}"</p>
-                    </div>
-                )}
             </div>
+
+            <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-2 gap-4">
+                <div>
+                    <span className="text-xs text-slate-400 block mb-1">ETA</span>
+                    <span className="text-xl font-bold text-white">
+                        {currentStep ? new Date(Date.now() + ((totalDistance || 10) - (progress * (totalDistance || 10))) * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                    </span>
+                </div>
+                <div>
+                    <span className="text-xs text-slate-400 block mb-1">STATUS</span>
+                    <span className={`text-sm font-bold px-2 py-1 rounded ${currentStep && currentStep.traffic > 0.8 ? 'bg-red-900/50 text-red-400' : 'bg-green-900/50 text-green-400'
+                        }`}>
+                        {currentStep && currentStep.traffic > 0.8 ? 'DELAYED' : 'ON TIME'}
+                    </span>
+                </div>
+            </div>
+
+            {currentStep?.reason && (
+                <div className="mt-4 bg-blue-900/40 p-3 rounded border border-blue-700/50 animate-fade-in">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-blue-300 uppercase tracking-wider font-bold">Driver Alert</span>
+                        <span className="flex h-2 w-2 relative">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                        </span>
+                    </div>
+                    <p className="text-sm text-blue-100 italic">"{currentStep.reason}"</p>
+                </div>
+            )}
 
             <div className="mt-4 pt-2 border-t border-slate-700">
                 <div className="flex justify-between text-xs text-slate-400 mb-1">

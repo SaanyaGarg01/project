@@ -119,6 +119,32 @@ export function MetricsPanel({ rlRoute, dijkstraRoute }: MetricsPanelProps) {
           </div>
         </div>
       </div>
+
+      <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
+        <h3 className="text-sm font-bold text-green-800 mb-3 flex items-center gap-2">
+          <Leaf className="w-4 h-4" /> Business Value & Sustainability
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <span className="text-xs text-green-600 block mb-1">COST SAVINGS</span>
+            <span className="text-lg font-bold text-green-900">
+              ${(Math.max(0, fuelSaved) * 1.5 * (dijkstraRoute.totalFuel / 100)).toFixed(2)}
+            </span>
+            <span className="text-xs text-green-700 ml-1">per trip</span>
+          </div>
+          <div>
+            <span className="text-xs text-green-600 block mb-1">ECO SCORE</span>
+            <div className="flex items-center gap-2">
+              <div className="text-lg font-bold text-green-900">
+                {Math.min(100, Math.max(0, 50 + fuelSaved)).toFixed(0)}/100
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 text-xs text-green-700 italic border-t border-green-200 pt-2">
+          "Switching to GreenPath could save approx. ${(Math.max(0, fuelSaved) * 1.5 * (dijkstraRoute.totalFuel / 100) * 250).toFixed(0)} annually per vehicle."
+        </div>
+      </div>
     </div>
   );
 }

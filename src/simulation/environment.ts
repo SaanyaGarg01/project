@@ -1,7 +1,8 @@
 import { TrafficConditions, WeatherConditions, WeatherType, Incident, IncidentType } from '../types/simulation';
 
 export class DynamicEnvironment {
-  private traffic: TrafficConditions = {};
+  private traffic: Map<string, number> = new Map();
+  private baseTrafficCongestion: number = 0.5; // Default base
   private weather: WeatherConditions = {
     rain: 0,
     type: 'clear',
@@ -14,17 +15,20 @@ export class DynamicEnvironment {
   private timeStep: number = 0; // consistent time tracking for predictive model
 
   constructor(private totalNodes: number) {
-    this.initializeConditions();
+    this.initializeTraffic();
+    this.initializeWeather(); // Separate weather initialization
   }
 
-  private initializeConditions(): void {
+  private initializeTraffic(): void {
     for (let i = 0; i < this.totalNodes; i++) {
       for (let j = i + 1; j < this.totalNodes; j++) {
         const key = this.getEdgeKey(i, j);
-        this.traffic[key] = 0.3 + Math.random() * 0.4;
+        this.traffic.set(key, this.baseTrafficCongestion * (0.6 + Math.random() * 0.8));
       }
     }
+  }
 
+  private initializeWeather(): void {
     this.weather.rain = Math.random() * 0.5;
     this.weather.type = this.determineWeatherType(this.weather.rain);
     this.updateVisibility();
@@ -57,7 +61,7 @@ export class DynamicEnvironment {
   getTrafficFactor(from: number, to: number): number {
     const key = this.getEdgeKey(from, to);
     // Base traffic + Incident impact
-    let factor = this.traffic[key] || 0.5;
+    let factor = this.traffic.get(key) || 0.5;
 
     // Check for incidents on either node
     const incident = this.incidents.find(i => i.nodeId === from || i.nodeId === to);
@@ -134,14 +138,82 @@ export class DynamicEnvironment {
     return this.incidents.length;
   }
 
+  async syncWithRealWorld(latitude: number = 40.7128, longitude: number = -74.0060) {
+    try {
+      const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,rain,showers,snowfall,weather_code,wind_speed_10m`);
+      const data = await response.json();
+
+      if (data.current) {
+        // Map Open-Meteo WMO codes to our types
+        const code = data.current.weather_code;
+        const rain = data.current.rain + data.current.showers;
+        // const wind = data.current.wind_speed_10m; // Not used directly for weather type, but could be for impact
+
+        this.weather.rain = Math.min(1, rain / 10); // Normalize roughly
+        this.weather.visibility = Math.max(0.1, 1 - (rain * 0.1 + (code > 40 ? 0.3 : 0))); // Simple visibility logic
+
+        if (code >= 95) this.weather.type = 'stormy';
+        else if (code >= 70) this.weather.type = 'snowy';
+        else if (rain > 0.5) this.weather.type = 'rainy';
+        else if (code >= 45) this.weather.type = 'foggy';
+        else this.weather.type = 'clear';
+
+        // Update flood risks if heavy rain
+        if (this.weather.rain > 0.8) {
+          // Re-evaluate flood zones based on heavy rain
+          this.weather.floodZones.clear();
+          const numFloodZones = Math.floor(Math.random() * 3); // Still random for specific nodes
+          for (let i = 0; i < numFloodZones; i++) {
+            this.weather.floodZones.add(Math.floor(Math.random() * this.totalNodes));
+          }
+        } else {
+          this.weather.floodZones.clear();
+        }
+
+        console.log(`Synced with Real Weather: ${this.weather.type}, Rain: ${this.weather.rain.toFixed(2)}`);
+      }
+    } catch (e) {
+      console.error("Failed to sync with real weather, falling back to simulation.", e);
+      this.updateConditions(); // Fallback
+    }
+  }
+
+  setTrafficIntensity(level: number) {
+    this.baseTrafficCongestion = Math.max(0, Math.min(1, level)); // Ensure level is between 0 and 1
+    // Regenerate traffic based on this base level
+    for (let i = 0; i < this.totalNodes; i++) {
+      for (let j = i + 1; j < this.totalNodes; j++) {
+        const key = this.getEdgeKey(i, j);
+        // Scale traffic values around the new base level
+        this.traffic.set(key, this.baseTrafficCongestion * (0.6 + Math.random() * 0.8));
+      }
+    }
+  }
+
+  setRainLevel(level: number) {
+    this.weather.rain = Math.max(0, Math.min(1, level)); // Ensure level is between 0 and 1
+    this.weather.type = this.determineWeatherType(this.weather.rain);
+    this.updateVisibility();
+    // Also update flood zones based on new rain level
+    if (this.weather.rain > 0.8) {
+      this.weather.floodZones.clear();
+      const numFloodZones = Math.floor(Math.random() * 3);
+      for (let i = 0; i < numFloodZones; i++) {
+        this.weather.floodZones.add(Math.floor(Math.random() * this.totalNodes));
+      }
+    } else {
+      this.weather.floodZones.clear();
+    }
+  }
+
   updateConditions(): void {
     this.timeStep = (this.timeStep + 1) % 1440; // Increment time
 
     // Update Traffic
-    for (const key in this.traffic) {
-      this.traffic[key] = Math.max(0.1, Math.min(2.0,
-        this.traffic[key] + (Math.random() - 0.5) * 0.3
-      ));
+    for (const [key, val] of this.traffic.entries()) {
+      this.traffic.set(key, Math.max(0.1, Math.min(2.0,
+        val + (Math.random() - 0.5) * 0.3
+      )));
     }
 
     // Update Weather

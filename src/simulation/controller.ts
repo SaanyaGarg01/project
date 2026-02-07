@@ -145,6 +145,22 @@ export class SimulationController {
     this.state.environment.stopAutoUpdate();
   }
 
+  setTrafficIntensity(level: number) {
+    this.state.environment.setTrafficIntensity(level);
+    this.notify();
+  }
+
+  setRainLevel(level: number) {
+    this.state.environment.setRainLevel(level);
+    this.notify();
+  }
+
+  // existing method
+  async syncWithRealWorld(): Promise<void> {
+    await this.state.environment.syncWithRealWorld();
+    this.notify();
+  }
+
   updateEnvironment(): void {
     this.state.environment.updateConditions();
     this.notify();

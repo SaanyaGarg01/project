@@ -17,6 +17,8 @@ interface ControlPanelProps {
   rainLevel: number;
   weatherType: string;
   incidentCount: number;
+  onTrafficChange: (val: number) => void;
+  onRainChange: (val: number) => void;
 }
 
 export function ControlPanel({
@@ -28,7 +30,9 @@ export function ControlPanel({
   onAlgorithmChange,
   rainLevel,
   weatherType,
-  incidentCount
+  incidentCount,
+  onTrafficChange,
+  onRainChange
 }: ControlPanelProps) {
   const [startNode, setStartNode] = useState('0');
   const [goalNode, setGoalNode] = useState('63');
@@ -172,7 +176,43 @@ export function ControlPanel({
         </div>
 
 
-        <div>
+        <div className="border-t pt-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-purple-600" /> Interactive Playground
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-gray-600">Base Traffic Congestion</span>
+                <span className="font-semibold">{Math.round(0.5 * 100)}% (drag to change)</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                defaultValue="50"
+                onChange={(e) => onTrafficChange(parseInt(e.target.value) / 100)}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              />
+            </div>
+            <div>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-gray-600">Rain Intensity</span>
+                <span className="font-semibold">{Math.round(rainLevel * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                defaultValue={rainLevel * 100}
+                onChange={(e) => onRainChange(parseInt(e.target.value) / 100)}
+                className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t pt-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Visualization
           </label>
@@ -242,13 +282,22 @@ export function ControlPanel({
           </button>
 
           <div className="grid grid-cols-2 gap-2">
-            <div className="flex flex-col items-center justify-center p-3 bg-blue-50 rounded-md">
+            <div className="flex flex-col items-center justify-center p-3 bg-blue-50 rounded-md relative group cursor-pointer transition-all hover:bg-blue-100" onClick={onUpdateEnvironment}>
+              <div className="absolute top-1 right-1">
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                </span>
+              </div>
               <div className="flex items-center gap-2 mb-1">
                 <CloudRain className="w-5 h-5 text-blue-600" />
-                <span className="text-xs font-medium text-gray-700">Weather</span>
+                <span className="text-xs font-medium text-gray-700">Weather API</span>
               </div>
               <span className="text-sm font-semibold text-blue-600 capitalize">{weatherType}</span>
-              <span className="text-xs text-gray-500">{(rainLevel * 100).toFixed(0)}% Precip</span>
+              <span className="text-xs text-gray-500">{(rainLevel * 100).toFixed(0)}% (Real-time)</span>
+              <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-md flex items-center justify-center">
+                <span className="text-xs font-bold text-blue-800 bg-white/80 px-2 py-1 rounded">SYNC</span>
+              </div>
             </div>
 
             <div className="flex flex-col items-center justify-center p-3 bg-red-50 rounded-md">
