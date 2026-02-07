@@ -3,7 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { RouteResult, FleetVehicle } from '../types/simulation';
 import { MapPin, Search, Target, Map as MapIcon, X, Loader2 } from 'lucide-react';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 // Fix Leaflet icon issue
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -197,53 +197,63 @@ function RouteLayer({
 }) {
     return (
         <>
-            {/* Full Background Path (Subtle) */}
+            {/* AI PATH HIGHLIGHTING - NEON GLOW STYLE */}
             {(activeAlgorithm === 'both' || activeAlgorithm === 'rl') && rlRoute && (
-                <Polyline
-                    positions={getRoutePoints(rlRoute, true)}
-                    pathOptions={{ color: '#10b981', weight: 4, opacity: 0.2 }}
-                />
+                <>
+                    {/* Shadow / Glow layer */}
+                    <Polyline
+                        positions={getRoutePoints(rlRoute, true)}
+                        pathOptions={{ color: '#059669', weight: 12, opacity: 0.15, lineJoin: 'round', lineCap: 'round' }}
+                    />
+                    {/* Background "Ghost" Full Path */}
+                    <Polyline
+                        positions={getRoutePoints(rlRoute, true)}
+                        pathOptions={{ color: '#10b981', weight: 4, opacity: 0.3, dashArray: '5, 10' }}
+                    />
+                    {/* Animated "Heavy" Selected Path */}
+                    <Polyline
+                        positions={getRoutePoints(rlRoute)}
+                        pathOptions={{
+                            color: '#059669',
+                            weight: 8,
+                            opacity: 1,
+                            lineJoin: 'round',
+                            lineCap: 'round',
+                        }}
+                        eventHandlers={{
+                            click: (e) => {
+                                L.popup()
+                                    .setLatLng(e.latlng)
+                                    .setContent(`
+                                        <div class="p-2 font-sans" style="min-width: 140px;">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <div class="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                                                <b class="text-emerald-800">GreenPath AI</b>
+                                            </div>
+                                            <div class="mt-2 grid grid-cols-2 gap-2 border-t pt-2">
+                                                <div>
+                                                    <p class="text-[9px] text-slate-400 uppercase font-extrabold">Fuel Rate</p>
+                                                    <p class="text-xs font-bold text-slate-800">${Math.abs(rlRoute.totalFuel).toFixed(2)} L</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-[9px] text-slate-400 uppercase font-extrabold">Time Est.</p>
+                                                    <p class="text-xs font-bold text-slate-800">${Math.abs(rlRoute.totalTime).toFixed(1)}m</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `)
+                                    .openOn(e.target._map);
+                            }
+                        }}
+                    />
+                </>
             )}
 
-            {/* Animated RL Path (Heavy) */}
-            {(activeAlgorithm === 'both' || activeAlgorithm === 'rl') && rlRoute && (
-                <Polyline
-                    positions={getRoutePoints(rlRoute)}
-                    pathOptions={{ color: '#059669', weight: 10, opacity: 0.9, lineJoin: 'round' }}
-                    eventHandlers={{
-                        click: (e) => {
-                            L.popup()
-                                .setLatLng(e.latlng)
-                                .setContent(`
-                                    <div class="p-2 font-sans" style="min-width: 140px;">
-                                        <div class="flex items-center gap-2 mb-1">
-                                            <div class="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                                            <b class="text-emerald-800">GreenPath AI</b>
-                                        </div>
-                                        <p class="text-[10px] text-slate-600">AI Green-Routing Metrics</p>
-                                        <div class="mt-2 grid grid-cols-2 gap-2 border-t pt-2">
-                                            <div>
-                                                <p class="text-[9px] text-slate-400 uppercase font-extrabold">Fuel Used</p>
-                                                <p class="text-xs font-bold text-slate-800">${Math.abs(rlRoute.totalFuel).toFixed(2)} L</p>
-                                            </div>
-                                            <div>
-                                                <p class="text-[9px] text-slate-400 uppercase font-extrabold">Time Est.</p>
-                                                <p class="text-xs font-bold text-slate-800">${Math.abs(rlRoute.totalTime).toFixed(1)}m</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `)
-                                .openOn(e.target._map);
-                        }
-                    }}
-                />
-            )}
-
-            {/* Baseline Path */}
+            {/* DIJKSTRA BASELINE - DASHED COMPARISON */}
             {(activeAlgorithm === 'both' || activeAlgorithm === 'dijkstra') && dijkstraRoute && (
                 <Polyline
                     positions={getRoutePoints(dijkstraRoute, true)}
-                    pathOptions={{ color: '#dc2626', weight: 4, opacity: 0.6, dashArray: '12, 12' }}
+                    pathOptions={{ color: '#dc2626', weight: 3, opacity: 0.8, dashArray: '8, 12' }}
                 />
             )}
         </>
@@ -310,40 +320,36 @@ export function RealMap({
             setGoalSuggestions([]);
         }
 
-        if (!selectedBounds) {
-            const size = 0.05;
+        // SMART CITY FOCUS LOGIC
+        // If we pick a location that is far from the current center (>30km), 
+        // we reset the bounds to focus on the NEW city instead of spanning across cities.
+        const currentCenter = selectedBounds?.getCenter();
+        const distanceToCenter = currentCenter ? map.distance(currentCenter, coords) / 1000 : 0;
+
+        if (!selectedBounds || distanceToCenter > 30) {
+            // Focus on the NEW location (Local City Scale)
+            const size = 0.02; // Tightened to ~2km local zone
             const newBounds = L.latLngBounds(
                 [lat - size, lon - size],
                 [lat + size, lon + size]
             );
             onAreaSelected(newBounds);
-            map.flyTo(coords, 13);
+            map.flyTo(coords, 14); // Closer zoom for city visibility
 
-            // On first geocode, select Node 0 (Top-left) or Node 27 (Center) to initialize state
+            // Map to edges for better routing spread
             onNodeSelected(type === 'start' ? 0 : 63, type);
         } else {
-            const sw = selectedBounds.getSouthWest();
-            const ne = selectedBounds.getNorthEast();
+            // Local Trip Expansion: Only expand slightly within the same city
+            const newBounds = selectedBounds.extend(coords).pad(0.05); // Less padding
+            onAreaSelected(newBounds);
 
-            // Check if coordinates are inside current bounds, if not expand
-            if (!selectedBounds.contains(coords)) {
-                const newBounds = selectedBounds.extend(coords).pad(0.1);
-                onAreaSelected(newBounds);
-                // After expansion, we need to recalculate xRel/yRel based on NEW bounds
-                const nsw = newBounds.getSouthWest();
-                const nne = newBounds.getNorthEast();
-                const xRel = (lon - nsw.lng) / (nne.lng - nsw.lng);
-                const yRel = (lat - nsw.lat) / (nne.lat - nsw.lat);
-                const col = Math.max(0, Math.min(7, Math.round(xRel * 7)));
-                const row = Math.max(0, Math.min(7, Math.round(yRel * 7)));
-                onNodeSelected(row * 8 + col, type);
-            } else {
-                const xRel = (lon - sw.lng) / (ne.lng - sw.lng);
-                const yRel = (lat - sw.lat) / (ne.lat - sw.lat);
-                const col = Math.max(0, Math.min(7, Math.round(xRel * 7)));
-                const row = Math.max(0, Math.min(7, Math.round(yRel * 7)));
-                onNodeSelected(row * 8 + col, type);
-            }
+            const nsw = newBounds.getSouthWest();
+            const nne = newBounds.getNorthEast();
+            const xRel = (lon - nsw.lng) / (nne.lng - nsw.lng);
+            const yRel = (lat - nsw.lat) / (nne.lat - nsw.lat);
+            const col = Math.max(0, Math.min(7, Math.round(xRel * 7)));
+            const row = Math.max(0, Math.min(7, Math.round(yRel * 7)));
+            onNodeSelected(row * 8 + col, type);
         }
     }, [selectedBounds, onAreaSelected, onNodeSelected]);
 
@@ -356,8 +362,21 @@ export function RealMap({
         return [lat, lng];
     }, [selectedBounds]);
 
-    const MapEvents = () => {
+    const MapController = () => {
         const map = useMap();
+
+        // Auto-Zoom to Route when it arrives (USING EFFECT FOR REACTIVITY)
+        useEffect(() => {
+            if (rlRoute && rlRoute.path.length > 1) {
+                const points = getRoutePoints(rlRoute, true);
+                if (points.length > 0) {
+                    const bounds = L.latLngBounds(points);
+                    // Tighter padding [40, 40] so path takes more screen space
+                    map.flyToBounds(bounds, { padding: [40, 40], duration: 1.2 });
+                }
+            }
+        }, [rlRoute, map, getRoutePoints]);
+
         useMapEvents({
             dblclick(e) {
                 const center = e.latlng;
@@ -433,7 +452,7 @@ export function RealMap({
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
-                <MapEvents />
+                <MapController />
 
                 <GeoControls
                     startQuery={startQuery}
