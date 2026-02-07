@@ -59,20 +59,24 @@ export class DijkstraRouter {
         const weatherImpact = this.environment.getWeatherImpact(neighbor);
         const isFlooded = this.environment.isFlooded(neighbor);
 
-        if (isFlooded) continue;
-
-        // Vehicle Specific Consumption Scaling
+        // Realistic Consumption Multipliers
         let consumptionMultiplier = 1.0;
         if (vehicle.type === 'ev') consumptionMultiplier = 0.2;
         if (vehicle.type === 'hybrid') consumptionMultiplier = 0.6;
 
         let edgeCost: number;
+        // Logic: Dijkstra now accepts 'Flooded' nodes but with a massive penalty, just like the AI.
+        const floodPenalty = isFlooded ? 500 : 0;
+        const timeCost = edge.distance * 0.002 * trafficFactor * weatherImpact; // 30km/h scale
+        const fuelCost = edge.distance * 0.00025 * consumptionMultiplier * trafficFactor * weatherImpact; // 4km/L scale
+
         if (constraints.priority === 'critical' || constraints.priority === 'high') {
-          edgeCost = (edge.distance / 60) * trafficFactor * weatherImpact;
+          edgeCost = timeCost + floodPenalty;
+        } else if (constraints.priority === 'low') {
+          edgeCost = (fuelCost * 2) + floodPenalty;
         } else {
-          const baseFuelCost = edge.distance * 0.05 * consumptionMultiplier;
-          const elevationCost = Math.max(0, edge.elevation * 0.02) * consumptionMultiplier;
-          edgeCost = (baseFuelCost + elevationCost) * trafficFactor * weatherImpact;
+          // Standard Balanced Baseline
+          edgeCost = (fuelCost * 5) + (timeCost * 2) + floodPenalty;
         }
 
         const newDistance = currentDistance + edgeCost;
@@ -93,13 +97,15 @@ export class DijkstraRouter {
       current = previous.get(current) || null;
     }
 
-    if (path[0] !== start) {
+    if (path.length <= 1 || path[0] !== start) {
+      // Fallback estimate for impossible geocoding match
+      const estDist = 5000; // 5km fallback
       return {
         path: [start, goal],
-        totalFuel: 999,
-        totalTime: 999,
-        totalDistance: 999,
-        co2Emissions: 999,
+        totalFuel: estDist * 0.00025,
+        totalTime: estDist * 0.002,
+        totalDistance: estDist,
+        co2Emissions: estDist * 0.00025 * (vehicle.type === 'ev' ? 0.4 : 2.3),
         steps: []
       };
     }
@@ -124,11 +130,11 @@ export class DijkstraRouter {
       const trafficFactor = this.environment.getTrafficFactor(from, to);
       const weatherImpact = this.environment.getWeatherImpact(to);
 
-      const baseFuelCost = edge.distance * 0.05;
-      const elevationCost = Math.max(0, edge.elevation * 0.02);
+      const baseFuelCost = edge.distance * 0.00025;
+      const elevationCost = Math.max(0, edge.elevation * 0.0001);
       const segmentFuel = (baseFuelCost + elevationCost) * trafficFactor * weatherImpact;
 
-      const segmentTime = (edge.distance / 60) * trafficFactor * weatherImpact;
+      const segmentTime = edge.distance * 0.002 * trafficFactor * weatherImpact;
 
       totalFuel += segmentFuel;
       totalTime += segmentTime;

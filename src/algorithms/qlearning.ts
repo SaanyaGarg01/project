@@ -63,7 +63,7 @@ export class QLearningAgent {
     // Blend current and predicted traffic
     const effectiveTraffic = (trafficFactor * 0.6) + (predictedTraffic * 0.4);
 
-    const baseTime = edge.distance / 60; // minutes
+    const baseTime = edge.distance * 0.002; // 30km/h scale
     const timeCost = baseTime * effectiveTraffic * weatherImpact;
 
     // Vehicle Specific Consumption Scaling
@@ -71,8 +71,8 @@ export class QLearningAgent {
     if (vehicle.type === 'ev') consumptionMultiplier = 0.2; // EVs are more efficient
     if (vehicle.type === 'hybrid') consumptionMultiplier = 0.6; // Hybrids in between
 
-    const baseFuelCost = edge.distance * 0.05 * consumptionMultiplier;
-    const elevationCost = Math.max(0, edge.elevation * 0.05) * consumptionMultiplier;
+    const baseFuelCost = edge.distance * 0.00025 * consumptionMultiplier;
+    const elevationCost = Math.max(0, edge.elevation * 0.0001) * consumptionMultiplier;
     const fuelCost = (baseFuelCost + elevationCost) * effectiveTraffic * weatherImpact;
 
     // Check range constraint
@@ -192,10 +192,10 @@ export class QLearningAgent {
 
         // Update virtual state for next step in episode
         // Calculate costs to update range/time
-        const baseFuelCost = edge.distance * 0.05;
-        const elevationCost = Math.max(0, edge.elevation * 0.05);
+        const baseFuelCost = edge.distance * 0.00018;
+        const elevationCost = Math.max(0, edge.elevation * 0.00005);
         const fuelCost = (baseFuelCost + elevationCost) * trafficFactor * weatherImpact;
-        const timeCost = (edge.distance / 60) * trafficFactor * weatherImpact;
+        const timeCost = edge.distance * 0.0015 * trafficFactor * weatherImpact;
 
         currentRange -= fuelCost;
         currentTime += timeCost;
@@ -311,15 +311,15 @@ export class QLearningAgent {
 
       const trafficFactor = this.environment.getTrafficFactor(currentNode, nextNode);
       const weatherImpact = this.environment.getWeatherImpact(nextNode);
-      const segmentTime = (edge.distance / 60) * trafficFactor * weatherImpact;
+      const segmentTime = edge.distance * 0.002 * trafficFactor * weatherImpact;
 
       // Vehicle Specific Consumption
       let consumptionMultiplier = 1.0;
       if (vehicle.type === 'ev') consumptionMultiplier = 0.2;
       if (vehicle.type === 'hybrid') consumptionMultiplier = 0.6;
 
-      const baseFuelCost = edge.distance * 0.05 * consumptionMultiplier;
-      const elevationCost = Math.max(0, edge.elevation * 0.05) * consumptionMultiplier;
+      const baseFuelCost = edge.distance * 0.00025 * consumptionMultiplier;
+      const elevationCost = Math.max(0, edge.elevation * 0.0001) * consumptionMultiplier;
       const segmentFuel = (baseFuelCost + elevationCost) * trafficFactor * weatherImpact;
 
       totalFuel += segmentFuel;

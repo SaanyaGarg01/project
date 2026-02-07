@@ -40,6 +40,71 @@ interface RealMapProps {
     trainingProgress?: number;
 }
 
+// DEFINING OUTSIDE COMPONENT TO PREVENT RE-MOUNTING ON STATE CHANGE
+function RouteLayer({
+    activeAlgorithm,
+    rlRoute,
+    dijkstraRoute,
+    getRoutePoints
+}: {
+    activeAlgorithm: string;
+    rlRoute?: RouteResult;
+    dijkstraRoute?: RouteResult;
+    getRoutePoints: (route: RouteResult, full?: boolean) => [number, number][]
+}) {
+    return (
+        <>
+            {/* Draw Route Polylines */}
+            {(activeAlgorithm === 'both' || activeAlgorithm === 'rl') && rlRoute && (
+                <Polyline
+                    positions={getRoutePoints(rlRoute, true)}
+                    pathOptions={{ color: '#10b981', weight: 4, opacity: 0.2 }}
+                />
+            )}
+
+            {(activeAlgorithm === 'both' || activeAlgorithm === 'rl') && rlRoute && (
+                <Polyline
+                    positions={getRoutePoints(rlRoute)}
+                    pathOptions={{ color: '#059669', weight: 10, opacity: 0.9, lineJoin: 'round' }}
+                    eventHandlers={{
+                        click: (e) => {
+                            L.popup()
+                                .setLatLng(e.latlng)
+                                .setContent(`
+                                    <div class="p-2 font-sans" style="min-width: 140px;">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <div class="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                                            <b class="text-emerald-800">GreenPath AI</b>
+                                        </div>
+                                        <p class="text-[10px] text-slate-600">AI Green-Routing Metrics</p>
+                                        <div class="mt-2 grid grid-cols-2 gap-2 border-t pt-2">
+                                            <div>
+                                                <p class="text-[9px] text-slate-400 uppercase font-extrabold">Fuel Used</p>
+                                                <p class="text-xs font-bold text-slate-800">${Math.abs(rlRoute.totalFuel).toFixed(2)} L</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-[9px] text-slate-400 uppercase font-extrabold">Time Est.</p>
+                                                <p class="text-xs font-bold text-slate-800">${Math.abs(rlRoute.totalTime).toFixed(1)}m</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `)
+                                .openOn(e.target._map);
+                        }
+                    }}
+                />
+            )}
+
+            {(activeAlgorithm === 'both' || activeAlgorithm === 'dijkstra') && dijkstraRoute && (
+                <Polyline
+                    positions={getRoutePoints(dijkstraRoute, true)}
+                    pathOptions={{ color: '#dc2626', weight: 4, opacity: 0.6, dashArray: '12, 12' }}
+                />
+            )}
+        </>
+    );
+}
+
 export function RealMap({
     graph,
     rlRoute,
@@ -83,7 +148,7 @@ export function RealMap({
             } finally {
                 setIsSearching(false);
             }
-        }, 800); // 800ms debounce
+        }, 800);
     };
 
     const handleSelectLocation = (result: SearchResult, type: 'start' | 'goal', map: L.Map) => {
@@ -110,7 +175,6 @@ export function RealMap({
         } else {
             const sw = selectedBounds.getSouthWest();
             const ne = selectedBounds.getNorthEast();
-
             const xRel = (lon - sw.lng) / (ne.lng - sw.lng);
             const yRel = (lat - sw.lat) / (ne.lat - sw.lat);
 
@@ -167,7 +231,7 @@ export function RealMap({
         return null;
     };
 
-    const getRoutePoints = (route: RouteResult, full: boolean = false) => {
+    const getRoutePoints = useCallback((route: RouteResult, full: boolean = false) => {
         if (!route || route.path.length < 2) return [];
         const pathLength = route.path.length - 1;
 
@@ -196,115 +260,111 @@ export function RealMap({
             }
         }
         return points;
-    };
+    }, [graph.nodes, animationProgress, transformToMap]);
 
-    // Helper to render search UI without re-creating a component
-    const SearchUI = ({ map }: { map: L.Map }) => (
-        <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-3 w-80 pointer-events-none">
-            <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-2xl p-4 border border-blue-100 pointer-events-auto transition-all hover:border-blue-300">
-                <div className="flex items-center gap-2 mb-4 text-blue-900 border-b border-blue-50 pb-2">
-                    <MapIcon className="w-5 h-5" />
-                    <h3 className="font-bold text-sm tracking-tight">Geo-routing Control</h3>
-                </div>
-
-                <div className="space-y-4">
-                    <div className="relative">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Pick Up Point</label>
-                        <div className="relative flex items-center">
-                            <MapPin className="absolute left-3 w-4 h-4 text-green-500" />
-                            <input
-                                type="text"
-                                placeholder="Type city or address..."
-                                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none transition-all placeholder:text-slate-400"
-                                value={startQuery}
-                                onChange={(e) => {
-                                    setStartQuery(e.target.value);
-                                    searchLocation(e.target.value, setStartSuggestions);
-                                }}
-                            />
-                            {startQuery && (
-                                <button onClick={() => { setStartQuery(''); setStartSuggestions([]); }} className="absolute right-3 p-1 hover:bg-slate-200 rounded-full transition-colors">
-                                    <X className="w-3 h-3 text-slate-500" />
-                                </button>
-                            )}
-                        </div>
-                        {startSuggestions.length > 0 && (
-                            <div className="absolute w-full mt-1 bg-white rounded-lg shadow-xl border border-slate-100 z-[1001] max-h-48 overflow-y-auto">
-                                {startSuggestions.map((s, i) => (
-                                    <div
-                                        key={i}
-                                        className="px-3 py-2 text-xs hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
-                                        onClick={() => handleSelectLocation(s, 'start', map)}
-                                    >
-                                        {s.display_name}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="relative">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Drop Off Goal</label>
-                        <div className="relative flex items-center">
-                            <Target className="absolute left-3 w-4 h-4 text-red-500" />
-                            <input
-                                type="text"
-                                placeholder="Destination location..."
-                                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500 outline-none transition-all placeholder:text-slate-400"
-                                value={goalQuery}
-                                onChange={(e) => {
-                                    setGoalQuery(e.target.value);
-                                    searchLocation(e.target.value, setGoalSuggestions);
-                                }}
-                            />
-                            {goalQuery && (
-                                <button onClick={() => { setGoalQuery(''); setGoalSuggestions([]); }} className="absolute right-3 p-1 hover:bg-slate-200 rounded-full transition-colors">
-                                    <X className="w-3 h-3 text-slate-500" />
-                                </button>
-                            )}
-                        </div>
-                        {goalSuggestions.length > 0 && (
-                            <div className="absolute w-full mt-1 bg-white rounded-lg shadow-xl border border-slate-100 z-[1001] max-h-48 overflow-y-auto">
-                                {goalSuggestions.map((s, i) => (
-                                    <div
-                                        key={i}
-                                        className="px-3 py-2 text-xs hover:bg-red-50 cursor-pointer border-b border-slate-50 last:border-0"
-                                        onClick={() => handleSelectLocation(s, 'goal', map)}
-                                    >
-                                        {s.display_name}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {selectedBounds && (
-                <div className="flex gap-2 pointer-events-auto">
-                    <button
-                        onClick={() => setSelectionMode('start')}
-                        className={`flex-1 py-3 px-4 rounded-xl shadow-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${selectionMode === 'start' ? 'bg-green-600 text-white ring-4 ring-green-100' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
-                    >
-                        <MapPin className="w-4 h-4" />
-                        PICK MAP START
-                    </button>
-                    <button
-                        onClick={() => setSelectionMode('goal')}
-                        className={`flex-1 py-3 px-4 rounded-xl shadow-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${selectionMode === 'goal' ? 'bg-red-600 text-white ring-4 ring-red-100' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
-                    >
-                        <Target className="w-4 h-4" />
-                        PICK MAP GOAL
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-
-    // Inner component to get map instance
-    const SearchContainer = () => {
+    const SearchPanel = () => {
         const map = useMap();
-        return <SearchUI map={map} />;
+        return (
+            <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-3 w-80 pointer-events-none">
+                <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-2xl p-4 border border-blue-100 pointer-events-auto transition-all hover:border-blue-300">
+                    <div className="flex items-center gap-2 mb-4 text-blue-900 border-b border-blue-50 pb-2">
+                        <MapIcon className="w-5 h-5" />
+                        <h3 className="font-bold text-sm tracking-tight">Geo-routing Control</h3>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="relative">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Pick Up Point</label>
+                            <div className="relative flex items-center">
+                                <MapPin className="absolute left-3 w-4 h-4 text-green-500" />
+                                <input
+                                    type="text"
+                                    placeholder="Type city or address..."
+                                    className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none transition-all placeholder:text-slate-400"
+                                    value={startQuery}
+                                    onChange={(e) => {
+                                        setStartQuery(e.target.value);
+                                        searchLocation(e.target.value, setStartSuggestions);
+                                    }}
+                                />
+                                {startQuery && (
+                                    <button onClick={() => { setStartQuery(''); setStartSuggestions([]); }} className="absolute right-3 p-1 hover:bg-slate-200 rounded-full transition-colors">
+                                        <X className="w-3 h-3 text-slate-500" />
+                                    </button>
+                                )}
+                            </div>
+                            {startSuggestions.length > 0 && (
+                                <div className="absolute w-full mt-1 bg-white rounded-lg shadow-xl border border-slate-100 z-[1001] max-h-48 overflow-y-auto">
+                                    {startSuggestions.map((s, i) => (
+                                        <div
+                                            key={i}
+                                            className="px-3 py-2 text-xs hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+                                            onClick={() => handleSelectLocation(s, 'start', map)}
+                                        >
+                                            {s.display_name}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="relative">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Drop Off Goal</label>
+                            <div className="relative flex items-center">
+                                <Target className="absolute left-3 w-4 h-4 text-red-500" />
+                                <input
+                                    type="text"
+                                    placeholder="Destination location..."
+                                    className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500 outline-none transition-all placeholder:text-slate-400"
+                                    value={goalQuery}
+                                    onChange={(e) => {
+                                        setGoalQuery(e.target.value);
+                                        searchLocation(e.target.value, setGoalSuggestions);
+                                    }}
+                                />
+                                {goalQuery && (
+                                    <button onClick={() => { setGoalQuery(''); setGoalSuggestions([]); }} className="absolute right-3 p-1 hover:bg-slate-200 rounded-full transition-colors">
+                                        <X className="w-3 h-3 text-slate-500" />
+                                    </button>
+                                )}
+                            </div>
+                            {goalSuggestions.length > 0 && (
+                                <div className="absolute w-full mt-1 bg-white rounded-lg shadow-xl border border-slate-100 z-[1001] max-h-48 overflow-y-auto">
+                                    {goalSuggestions.map((s, i) => (
+                                        <div
+                                            key={i}
+                                            className="px-3 py-2 text-xs hover:bg-red-50 cursor-pointer border-b border-slate-50 last:border-0"
+                                            onClick={() => handleSelectLocation(s, 'goal', map)}
+                                        >
+                                            {s.display_name}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {selectedBounds && (
+                    <div className="flex gap-2 pointer-events-auto">
+                        <button
+                            onClick={() => setSelectionMode('start')}
+                            className={`flex-1 py-3 px-4 rounded-xl shadow-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${selectionMode === 'start' ? 'bg-green-600 text-white ring-4 ring-green-100' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
+                        >
+                            <MapPin className="w-4 h-4" />
+                            PICK MAP START
+                        </button>
+                        <button
+                            onClick={() => setSelectionMode('goal')}
+                            className={`flex-1 py-3 px-4 rounded-xl shadow-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${selectionMode === 'goal' ? 'bg-red-600 text-white ring-4 ring-red-100' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
+                        >
+                            <Target className="w-4 h-4" />
+                            PICK MAP GOAL
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
     };
 
     return (
@@ -322,7 +382,7 @@ export function RealMap({
                 />
 
                 <MapEvents />
-                <SearchContainer />
+                <SearchPanel />
 
                 {selectedBounds && (
                     <Rectangle
@@ -331,53 +391,12 @@ export function RealMap({
                     />
                 )}
 
-                {/* Draw Route Polylines */}
-                {(activeAlgorithm === 'both' || activeAlgorithm === 'rl') && rlRoute && (
-                    <Polyline
-                        positions={getRoutePoints(rlRoute, true)}
-                        pathOptions={{ color: '#10b981', weight: 4, opacity: 0.2 }}
-                    />
-                )}
-
-                {(activeAlgorithm === 'both' || activeAlgorithm === 'rl') && rlRoute && (
-                    <Polyline
-                        positions={getRoutePoints(rlRoute)}
-                        pathOptions={{ color: '#059669', weight: 10, opacity: 0.9, lineJoin: 'round' }}
-                        eventHandlers={{
-                            click: (e) => {
-                                L.popup()
-                                    .setLatLng(e.latlng)
-                                    .setContent(`
-                                        <div class="p-2 font-sans" style="min-width: 140px;">
-                                            <div class="flex items-center gap-2 mb-1">
-                                                <div class="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                                                <b class="text-emerald-800">GreenPath AI</b>
-                                            </div>
-                                            <p class="text-[10px] text-slate-600">AI Green-Routing Metrics</p>
-                                            <div class="mt-2 grid grid-cols-2 gap-2 border-t pt-2">
-                                                <div>
-                                                    <p class="text-[9px] text-slate-400 uppercase font-extrabold">Fuel Used</p>
-                                                    <p class="text-xs font-bold text-slate-800">{Math.abs(rlRoute.totalFuel).toFixed(2)} L</p>
-                                                </div>
-                                                <div>
-                                                    <p class="text-[9px] text-slate-400 uppercase font-extrabold">Time Est.</p>
-                                                    <p class="text-xs font-bold text-slate-800">{Math.abs(rlRoute.totalTime).toFixed(1)}m</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    `)
-                                    .openOn(e.target._map);
-                            }
-                        }}
-                    />
-                )}
-
-                {(activeAlgorithm === 'both' || activeAlgorithm === 'dijkstra') && dijkstraRoute && (
-                    <Polyline
-                        positions={getRoutePoints(dijkstraRoute, true)}
-                        pathOptions={{ color: '#dc2626', weight: 4, opacity: 0.6, dashArray: '12, 12' }}
-                    />
-                )}
+                <RouteLayer
+                    activeAlgorithm={activeAlgorithm}
+                    rlRoute={rlRoute}
+                    dijkstraRoute={dijkstraRoute}
+                    getRoutePoints={getRoutePoints}
+                />
 
                 {fleet.map(v => {
                     const node = graph.nodes.get(v.location);
