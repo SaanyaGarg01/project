@@ -3,13 +3,15 @@ import { CityMap } from './components/CityMap';
 import { MetricsPanel } from './components/MetricsPanel';
 import { ControlPanel } from './components/ControlPanel';
 import { SimulationController } from './simulation/controller';
-import { RouteResult, DeliveryConstraint, VehicleConstraints, FleetVehicle } from './types/simulation';
+import { RouteResult, DeliveryConstraint, VehicleConstraints, FleetVehicle, PriorityLevel } from './types/simulation';
 import { Navigation } from 'lucide-react';
 import { TelematicsPanel } from './components/TelematicsPanel';
 import { TrainingChart } from './components/TrainingChart';
 import { VoiceAssistant } from './components/VoiceAssistant';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginScreen } from './components/LoginScreen';
+import { RealMap } from './components/RealMap';
+import L from 'leaflet';
 
 const controller = new SimulationController();
 
@@ -26,8 +28,18 @@ function Dashboard() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [currentVehicle, setCurrentVehicle] = useState<VehicleConstraints | null>(null);
   const [fleet, setFleet] = useState<FleetVehicle[]>(controller.getFleet());
-
   const [currentConstraints, setCurrentConstraints] = useState<DeliveryConstraint | null>(null);
+  const [isRealMapMode, setIsRealMapMode] = useState(false);
+  const [selectedBounds, setSelectedBounds] = useState<L.LatLngBounds | null>(null);
+  const [startNode, setStartNode] = useState('0');
+  const [goalNode, setGoalNode] = useState('63');
+
+  // Lifted Simulation Settings
+  const [priority, setPriority] = useState<PriorityLevel>('standard');
+  const [windowStart, setWindowStart] = useState('08:00');
+  const [windowEnd, setWindowEnd] = useState('17:00');
+  const [weight, setWeight] = useState('50');
+  const [vehicleType, setVehicleType] = useState<'ev' | 'petrol' | 'hybrid'>('ev');
 
   useEffect(() => {
     const unsubscribe = controller.subscribe(() => {
@@ -43,12 +55,36 @@ function Dashboard() {
     };
   }, []);
 
-  const handleRunSimulation = useCallback(async (
+  const executeSimulation = useCallback(async (
     start: number,
     goal: number,
-    constraints: DeliveryConstraint,
-    vehicle: VehicleConstraints
+    currentPriority: PriorityLevel,
+    wStart: string,
+    wEnd: string,
+    payloadWeight: string,
+    vType: 'ev' | 'petrol' | 'hybrid'
   ) => {
+    // Parse time strings
+    const [startH, startM] = wStart.split(':').map(Number);
+    const [endH, endM] = wEnd.split(':').map(Number);
+    const startMins = startH * 60 + startM;
+    const endMins = endH * 60 + endM;
+
+    const constraints: DeliveryConstraint = {
+      priority: currentPriority,
+      windowStart: startMins,
+      windowEnd: endMins,
+      weight: parseInt(payloadWeight)
+    };
+
+    const vehicle: VehicleConstraints = {
+      type: vType,
+      maxRange: vType === 'ev' ? 200 : 500,
+      currentRange: vType === 'ev' ? 150 : 400,
+      capacity: 1000,
+      maxDriveTime: 480
+    };
+
     setCurrentConstraints(constraints);
     setCurrentVehicle(vehicle);
     setRlRoute(undefined);
@@ -57,12 +93,10 @@ function Dashboard() {
     setIsAnimating(false);
 
     await controller.trainAgent(start, goal, constraints, vehicle, 200);
-
     const results = await controller.runComparison(start, goal, constraints, vehicle);
 
     setRlRoute(results.rl);
     setDijkstraRoute(results.dijkstra);
-
     setIsAnimating(true);
     setAnimationProgress(0);
 
@@ -77,6 +111,18 @@ function Dashboard() {
       setAnimationProgress(progress);
     }, 50);
   }, []);
+
+  const handleRunSimulation = useCallback(() => {
+    executeSimulation(
+      parseInt(startNode),
+      parseInt(goalNode),
+      priority,
+      windowStart,
+      windowEnd,
+      weight,
+      vehicleType
+    );
+  }, [executeSimulation, startNode, goalNode, priority, windowStart, windowEnd, weight, vehicleType]);
 
   const handleUpdateEnvironment = useCallback(async () => {
     await controller.syncWithRealWorld();
@@ -112,7 +158,16 @@ function Dashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="text-right hidden md:block">
+            <button
+              onClick={() => setIsRealMapMode(!isRealMapMode)}
+              className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 border shadow-sm ${isRealMapMode
+                ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+            >
+              🌍 {isRealMapMode ? 'Exit Real Map' : 'Real Map Mode'}
+            </button>
+            <div className="text-right hidden md:block border-l pl-4">
               <p className="text-sm font-bold text-gray-800">{user?.name}</p>
               <p className="text-xs text-blue-600 uppercase font-semibold tracking-wider">{user?.role}</p>
             </div>
@@ -131,24 +186,59 @@ function Dashboard() {
           <div className="lg:col-span-2 space-y-6">
             {/* Map Card */}
             <div className="bg-white rounded-lg shadow-lg p-6">
-              {/* ... map content ... */}
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-800">City Network Visualization</h2>
+                <h2 className="text-xl font-bold text-gray-800">
+                  {isRealMapMode ? 'Real-World Fleet Deployment' : 'City Network Visualization'}
+                </h2>
                 {isAnimating && (
                   <span className="text-sm text-blue-600 font-medium animate-pulse">
                     Route Animation in Progress...
                   </span>
                 )}
               </div>
-              <div className="flex justify-center">
-                <CityMap
-                  graph={controller.getState().graph}
-                  environment={controller.getState().environment} // Use direct state access or prop
-                  rlRoute={rlRoute}
-                  dijkstraRoute={dijkstraRoute}
-                  activeAlgorithm={activeAlgorithm}
-                  animationProgress={animationProgress}
-                />
+              <div className="flex justify-center transition-all">
+                {isRealMapMode ? (
+                  <RealMap
+                    graph={controller.getState().graph}
+                    rlRoute={rlRoute}
+                    dijkstraRoute={dijkstraRoute}
+                    activeAlgorithm={activeAlgorithm}
+                    animationProgress={animationProgress}
+                    fleet={fleet}
+                    selectedBounds={selectedBounds}
+                    onAreaSelected={setSelectedBounds}
+                    startNode={parseInt(startNode)}
+                    goalNode={parseInt(goalNode)}
+                    onNodeSelected={(id, type) => {
+                      const newId = id.toString();
+                      if (type === 'start') setStartNode(newId);
+                      else {
+                        setGoalNode(newId);
+                        // Auto-trigger simulation immediately
+                        executeSimulation(
+                          parseInt(startNode),
+                          id,
+                          priority,
+                          windowStart,
+                          windowEnd,
+                          weight,
+                          vehicleType
+                        );
+                      }
+                    }}
+                    isTraining={controller.getState().isTraining}
+                    trainingProgress={controller.getState().trainingProgress}
+                  />
+                ) : (
+                  <CityMap
+                    graph={controller.getState().graph}
+                    environment={controller.getState().environment}
+                    rlRoute={rlRoute}
+                    dijkstraRoute={dijkstraRoute}
+                    activeAlgorithm={activeAlgorithm}
+                    animationProgress={animationProgress}
+                  />
+                )}
               </div>
             </div>
 
@@ -176,9 +266,21 @@ function Dashboard() {
               rainLevel={controller.getState().environment.getRainLevel()}
               weatherType={controller.getState().environment.getWeatherType()}
               incidentCount={controller.getState().environment.getIncidentCount()}
-              onTrafficChange={(val) => controller.setTrafficIntensity(val)}
-              onRainChange={(val) => controller.setRainLevel(val)}
               onCityChange={(city) => controller.setCity(city)}
+              startNode={startNode}
+              goalNode={goalNode}
+              onStartNodeChange={setStartNode}
+              onGoalNodeChange={setGoalNode}
+              priority={priority}
+              onPriorityChange={setPriority}
+              windowStart={windowStart}
+              onWindowStartChange={setWindowStart}
+              windowEnd={windowEnd}
+              onWindowEndChange={setWindowEnd}
+              weight={weight}
+              onWeightChange={setWeight}
+              vehicleType={vehicleType}
+              onVehicleTypeChange={setVehicleType}
             />
             {/* ... other components ... */}
             <VoiceAssistant onCommand={handleVoiceCommand} />

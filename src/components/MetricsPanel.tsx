@@ -75,15 +75,15 @@ export function MetricsPanel({ rlRoute, dijkstraRoute, constraints }: MetricsPan
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Gauge className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-600">{rlRoute.totalFuel.toFixed(2)} L</span>
+              <span className="text-sm text-gray-600">{Math.abs(rlRoute.totalFuel).toFixed(2)} L</span>
             </div>
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-600">{rlRoute.totalTime.toFixed(1)} min</span>
+              <span className="text-sm text-gray-600">{Math.abs(rlRoute.totalTime).toFixed(1)} min</span>
             </div>
             <div className="flex items-center gap-2">
               <Leaf className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-600">{rlRoute.co2Emissions.toFixed(2)} kg</span>
+              <span className="text-sm text-gray-600">{Math.abs(rlRoute.co2Emissions).toFixed(2)} kg</span>
             </div>
           </div>
         </div>
@@ -96,15 +96,15 @@ export function MetricsPanel({ rlRoute, dijkstraRoute, constraints }: MetricsPan
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Gauge className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-600">{dijkstraRoute.totalFuel.toFixed(2)} L</span>
+              <span className="text-sm text-gray-600">{Math.abs(dijkstraRoute.totalFuel).toFixed(2)} L</span>
             </div>
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-600">{dijkstraRoute.totalTime.toFixed(1)} min</span>
+              <span className="text-sm text-gray-600">{Math.abs(dijkstraRoute.totalTime).toFixed(1)} min</span>
             </div>
             <div className="flex items-center gap-2">
               <Leaf className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-600">{dijkstraRoute.co2Emissions.toFixed(2)} kg</span>
+              <span className="text-sm text-gray-600">{Math.abs(dijkstraRoute.co2Emissions).toFixed(2)} kg</span>
             </div>
           </div>
         </div>
@@ -155,10 +155,10 @@ export function MetricsPanel({ rlRoute, dijkstraRoute, constraints }: MetricsPan
           <span className="text-sm text-gray-600">Net Emissions Change</span>
           <div className={`text-right ${co2Reduction >= 0 ? 'text-green-600' : 'text-red-500'}`}>
             <div className="text-lg font-bold">
-              {co2Reduction > 0 ? '-' : '+'}{Math.abs(co2Reduction).toFixed(2)} kg
+              {Math.abs(co2Reduction).toFixed(2)} kg
             </div>
             <div className="text-[10px] uppercase font-semibold">
-              {co2Reduction >= 0 ? 'Reduced' : 'Added'}
+              {co2Reduction >= 0 ? 'Total Saved' : 'Total Added'}
             </div>
           </div>
         </div>
@@ -170,11 +170,11 @@ export function MetricsPanel({ rlRoute, dijkstraRoute, constraints }: MetricsPan
         </h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <span className="text-xs text-green-600 block mb-1">ESTIMATED SAVINGS</span>
+            <span className="text-xs text-green-600 block mb-1">ESTIMATED TRIP SAVINGS</span>
             <span className={`text-lg font-bold ${fuelImprovement >= 0 ? 'text-green-900' : 'text-red-700'}`}>
-              ${(fuelImprovement >= 0 ? (fuelImprovement / 100 * dijkstraRoute.totalFuel * 1.5) : -(Math.abs(fuelImprovement) / 100 * dijkstraRoute.totalFuel * 1.5)).toFixed(2)}
+              ₹{Math.abs(fuelImprovement / 100 * dijkstraRoute.totalFuel * 105).toFixed(2)}
             </span>
-            <span className="text-xs text-green-700 ml-1">per trip</span>
+            <span className="text-xs text-green-700 ml-1">{fuelImprovement >= 0 ? 'Saved' : 'Efficiency Loss'}</span>
           </div>
           <div>
             <span className="text-xs text-green-600 block mb-1">ECO SCORE</span>

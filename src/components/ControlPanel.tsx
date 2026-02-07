@@ -1,14 +1,8 @@
-import { useState } from 'react';
-import { Play, RotateCcw, Zap, CloudRain, Clock, Truck, Battery } from 'lucide-react';
-import { DeliveryConstraint, VehicleConstraints, PriorityLevel } from '../types/simulation';
+import { Play, RotateCcw, Zap, CloudRain, Clock, Truck } from 'lucide-react';
+import { PriorityLevel } from '../types/simulation';
 
 interface ControlPanelProps {
-  onRunSimulation: (
-    start: number,
-    goal: number,
-    constraints: DeliveryConstraint,
-    vehicle: VehicleConstraints
-  ) => void;
+  onRunSimulation: () => void;
   onUpdateEnvironment: () => void;
   isTraining: boolean;
   trainingProgress: number;
@@ -17,9 +11,23 @@ interface ControlPanelProps {
   rainLevel: number;
   weatherType: string;
   incidentCount: number;
-  onTrafficChange: (val: number) => void;
-  onRainChange: (val: number) => void;
   onCityChange: (city: string) => void;
+  startNode: string;
+  goalNode: string;
+  onStartNodeChange: (val: string) => void;
+  onGoalNodeChange: (val: string) => void;
+
+  // Lifted States
+  priority: PriorityLevel;
+  onPriorityChange: (val: PriorityLevel) => void;
+  windowStart: string;
+  onWindowStartChange: (val: string) => void;
+  windowEnd: string;
+  onWindowEndChange: (val: string) => void;
+  weight: string;
+  onWeightChange: (val: string) => void;
+  vehicleType: 'ev' | 'petrol' | 'hybrid';
+  onVehicleTypeChange: (val: 'ev' | 'petrol' | 'hybrid') => void;
 }
 
 export function ControlPanel({
@@ -32,60 +40,42 @@ export function ControlPanel({
   rainLevel,
   weatherType,
   incidentCount,
-  onTrafficChange,
-  onRainChange,
-  onCityChange
+  onCityChange,
+  startNode,
+  goalNode,
+  onStartNodeChange,
+  onGoalNodeChange,
+  priority,
+  onPriorityChange,
+  windowStart,
+  onWindowStartChange,
+  windowEnd,
+  onWindowEndChange,
+  weight,
+  onWeightChange,
+  vehicleType,
+  onVehicleTypeChange
 }: ControlPanelProps) {
-  const [startNode, setStartNode] = useState('0');
-  const [goalNode, setGoalNode] = useState('63');
-  const [priority, setPriority] = useState<PriorityLevel>('standard');
-  const [windowStart, setWindowStart] = useState('08:00');
-  const [windowEnd, setWindowEnd] = useState('17:00');
-  const [weight, setWeight] = useState('50');
-  const [vehicleType, setVehicleType] = useState<'ev' | 'petrol' | 'hybrid'>('ev');
-
-  const handleRun = () => {
-    const start = parseInt(startNode);
-    const goal = parseInt(goalNode);
-
-    // Parse time strings to minutes from midnight
-    const [startH, startM] = windowStart.split(':').map(Number);
-    const [endH, endM] = windowEnd.split(':').map(Number);
-    const startMins = startH * 60 + startM;
-    const endMins = endH * 60 + endM;
-
-    const constraints: DeliveryConstraint = {
-      priority,
-      windowStart: startMins,
-      windowEnd: endMins,
-      weight: parseInt(weight)
-    };
-
-    const vehicle: VehicleConstraints = {
-      type: vehicleType,
-      maxRange: vehicleType === 'ev' ? 200 : 500, // Simple defaults
-      currentRange: vehicleType === 'ev' ? 150 : 400,
-      capacity: 1000,
-      maxDriveTime: 480 // 8 hours
-    };
-
-    if (!isNaN(start) && !isNaN(goal) && start >= 0 && goal <= 63) {
-      onRunSimulation(start, goal, constraints, vehicle);
-    }
-  };
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 max-h-[80vh] overflow-y-auto">
 
       <div className="bg-gradient-to-r from-blue-900 to-slate-900 -mx-6 -mt-6 p-4 rounded-t-lg mb-6 text-white">
-        <h2 className="text-lg font-bold">Simulation Controls</h2>
-        <div className="mt-3">
-          <label className="text-xs text-blue-200 uppercase font-bold tracking-wider block mb-1">Active City Profile</label>
-          <select onChange={(e) => onCityChange(e.target.value)} className="w-full bg-slate-800 border border-slate-600 text-white text-sm rounded p-2 focus:ring-2 focus:ring-blue-500">
-            <option value="Mumbai">Mumbai (High Traffic, Monsoon)</option>
-            <option value="Delhi">Delhi (Pollution Aware)</option>
-            <option value="Bangalore">Bangalore (Tech Hub, Signals)</option>
-          </select>
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-lg font-bold">Simulation Controls</h2>
+          <div className="text-[10px] bg-white/20 px-2 py-0.5 rounded border border-white/30 uppercase tracking-tighter">
+            v2.6 Intelligence
+          </div>
+        </div>
+        <div className="mt-3 space-y-3">
+          <div>
+            <label className="text-xs text-blue-200 uppercase font-bold tracking-wider block mb-1">Active City Profile</label>
+            <select onChange={(e) => onCityChange(e.target.value)} className="w-full bg-slate-800 border border-slate-600 text-white text-sm rounded p-2 focus:ring-2 focus:ring-blue-500">
+              <option value="Mumbai">Mumbai (High Traffic, Monsoon)</option>
+              <option value="Delhi">Delhi (Pollution Aware)</option>
+              <option value="Bangalore">Bangalore (Tech Hub, Signals)</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -100,7 +90,7 @@ export function ControlPanel({
               min="0"
               max="63"
               value={startNode}
-              onChange={(e) => setStartNode(e.target.value)}
+              onChange={(e) => onStartNodeChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
               disabled={isTraining}
             />
@@ -114,7 +104,7 @@ export function ControlPanel({
               min="0"
               max="63"
               value={goalNode}
-              onChange={(e) => setGoalNode(e.target.value)}
+              onChange={(e) => onGoalNodeChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
               disabled={isTraining}
             />
@@ -128,7 +118,7 @@ export function ControlPanel({
             </label>
             <select
               value={priority}
-              onChange={(e) => setPriority(e.target.value as PriorityLevel)}
+              onChange={(e) => onPriorityChange(e.target.value as PriorityLevel)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
               disabled={isTraining}
             >
@@ -166,7 +156,7 @@ export function ControlPanel({
             </label>
             <select
               value={vehicleType}
-              onChange={(e) => setVehicleType(e.target.value as any)}
+              onChange={(e) => onVehicleTypeChange(e.target.value as any)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
               disabled={isTraining}
             >
@@ -184,11 +174,11 @@ export function ControlPanel({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Window Start</label>
-              <input type="time" value={windowStart} onChange={e => setWindowStart(e.target.value)} className="w-full border rounded p-1 text-sm" />
+              <input type="time" value={windowStart} onChange={e => onWindowStartChange(e.target.value)} className="w-full border rounded p-1 text-sm" />
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Window End</label>
-              <input type="time" value={windowEnd} onChange={e => setWindowEnd(e.target.value)} className="w-full border rounded p-1 text-sm" />
+              <input type="time" value={windowEnd} onChange={e => onWindowEndChange(e.target.value)} className="w-full border rounded p-1 text-sm" />
             </div>
           </div>
         </div>
@@ -203,7 +193,7 @@ export function ControlPanel({
               min="10"
               max="1000"
               value={weight}
-              onChange={e => setWeight(e.target.value)}
+              onChange={e => onWeightChange(e.target.value)}
               className="flex-1"
             />
             <span className="text-sm text-gray-600 w-16 text-right">{weight} kg</span>
@@ -226,7 +216,6 @@ export function ControlPanel({
                 min="0"
                 max="100"
                 defaultValue="50"
-                onChange={(e) => onTrafficChange(parseInt(e.target.value) / 100)}
                 className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
               />
             </div>
@@ -240,7 +229,6 @@ export function ControlPanel({
                 min="0"
                 max="100"
                 defaultValue={rainLevel * 100}
-                onChange={(e) => onRainChange(parseInt(e.target.value) / 100)}
                 className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
               />
             </div>
@@ -283,7 +271,7 @@ export function ControlPanel({
         </div>
 
         <button
-          onClick={handleRun}
+          onClick={onRunSimulation}
           disabled={isTraining}
           className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-md font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >

@@ -87,25 +87,25 @@ export class QLearningAgent {
       timeWindowPenalty = (constraints.windowStart - projectedArrival) * 50; // Early penalty (waiting)
     }
 
-    let reward = -(fuelCost * 10 + timeCost * 5 + timeWindowPenalty);
+    let reward = -(fuelCost * 15 + timeCost * 8 + timeWindowPenalty * 1.5);
 
     // Priority-based reward adjustments
     switch (constraints.priority) {
       case 'critical':
-        // Time is everything. Fuel is irrelevant.
-        reward = -(timeCost * 100 + timeWindowPenalty * 10);
+        // Absolute focus on time reduction
+        reward = -(timeCost * 150 + timeWindowPenalty * 20);
         break;
       case 'high':
-        // Time is important, but efficiency matters.
-        reward = -(timeCost * 50 + fuelCost * 2 + timeWindowPenalty * 5);
+        // Fast but respect fuel
+        reward = -(timeCost * 80 + fuelCost * 5 + timeWindowPenalty * 10);
         break;
       case 'standard':
-        // Balanced approach.
-        reward = -(fuelCost * 10 + timeCost * 5 + timeWindowPenalty);
+        // Aggressive balance
+        reward = -(fuelCost * 25 + timeCost * 15 + timeWindowPenalty * 2);
         break;
       case 'low':
-        // Fuel efficiency is king. Time is flexible.
-        reward = -(fuelCost * 20 + timeCost + timeWindowPenalty * 0.5);
+        // Maximum fuel conservation
+        reward = -(fuelCost * 50 + timeCost * 2 + timeWindowPenalty);
         break;
     }
 
