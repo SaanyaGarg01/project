@@ -161,8 +161,18 @@ export class SimulationController {
     this.notify();
   }
 
+  setCity(cityName: string) {
+    this.state.environment.setCity(cityName);
+    this.notify();
+  }
+
+  getFleet() {
+    return this.state.environment.getFleet();
+  }
+
   updateEnvironment(): void {
     this.state.environment.updateConditions();
+    this.state.environment.updateFleet(); // Simulate fleet movement
     this.notify();
   }
 }

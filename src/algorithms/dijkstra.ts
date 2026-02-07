@@ -61,12 +61,17 @@ export class DijkstraRouter {
 
         if (isFlooded) continue;
 
+        // Vehicle Specific Consumption Scaling
+        let consumptionMultiplier = 1.0;
+        if (vehicle.type === 'ev') consumptionMultiplier = 0.2;
+        if (vehicle.type === 'hybrid') consumptionMultiplier = 0.6;
+
         let edgeCost: number;
         if (constraints.priority === 'critical' || constraints.priority === 'high') {
           edgeCost = (edge.distance / 60) * trafficFactor * weatherImpact;
         } else {
-          const baseFuelCost = edge.distance * 0.05;
-          const elevationCost = Math.max(0, edge.elevation * 0.02);
+          const baseFuelCost = edge.distance * 0.05 * consumptionMultiplier;
+          const elevationCost = Math.max(0, edge.elevation * 0.02) * consumptionMultiplier;
           edgeCost = (baseFuelCost + elevationCost) * trafficFactor * weatherImpact;
         }
 
@@ -108,6 +113,7 @@ export class DijkstraRouter {
       time: number;
       traffic: number;
       weather: number;
+      reason?: string;
     }> = [];
 
     for (let i = 0; i < path.length - 1; i++) {
@@ -137,7 +143,12 @@ export class DijkstraRouter {
       });
     }
 
-    const co2Emissions = totalFuel * 2.31;
+    // Vehicle Specific CO2 calculation
+    let co2Factor = 2.31;
+    if (vehicle.type === 'ev') co2Factor = 0.4;
+    if (vehicle.type === 'hybrid') co2Factor = 1.2;
+
+    const co2Emissions = totalFuel * co2Factor;
 
     return {
       path,

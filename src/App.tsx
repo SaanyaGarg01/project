@@ -3,11 +3,11 @@ import { CityMap } from './components/CityMap';
 import { MetricsPanel } from './components/MetricsPanel';
 import { ControlPanel } from './components/ControlPanel';
 import { SimulationController } from './simulation/controller';
-import { RouteResult, DeliveryConstraint, VehicleConstraints } from './types/simulation';
+import { RouteResult, DeliveryConstraint, VehicleConstraints, FleetVehicle } from './types/simulation';
 import { Navigation } from 'lucide-react';
 import { TelematicsPanel } from './components/TelematicsPanel';
 import { TrainingChart } from './components/TrainingChart';
-import { VoiceAssistant } from './components/VoiceAssistant'; // Restored import
+import { VoiceAssistant } from './components/VoiceAssistant';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginScreen } from './components/LoginScreen';
 
@@ -16,22 +16,23 @@ const controller = new SimulationController();
 function Dashboard() {
   const { user, logout } = useAuth();
 
-  if (!user) {
-    return <LoginScreen />;
-  }
+  if (!user) return <LoginScreen />;
 
-  // existing state...
-  const [, setUpdateTrigger] = useState(0); // Restored state variable
+  const [, setUpdateTrigger] = useState(0);
   const [rlRoute, setRlRoute] = useState<RouteResult | undefined>();
   const [dijkstraRoute, setDijkstraRoute] = useState<RouteResult | undefined>();
   const [activeAlgorithm, setActiveAlgorithm] = useState<'both' | 'rl' | 'dijkstra'>('both');
   const [animationProgress, setAnimationProgress] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [currentVehicle, setCurrentVehicle] = useState<VehicleConstraints | null>(null);
+  const [fleet, setFleet] = useState<FleetVehicle[]>(controller.getFleet());
+
+  const [currentConstraints, setCurrentConstraints] = useState<DeliveryConstraint | null>(null);
 
   useEffect(() => {
     const unsubscribe = controller.subscribe(() => {
       setUpdateTrigger(prev => prev + 1);
+      setFleet([...controller.getFleet()]); // Update fleet state
     });
 
     controller.startEnvironmentUpdates();
@@ -48,6 +49,7 @@ function Dashboard() {
     constraints: DeliveryConstraint,
     vehicle: VehicleConstraints
   ) => {
+    setCurrentConstraints(constraints);
     setCurrentVehicle(vehicle);
     setRlRoute(undefined);
     setDijkstraRoute(undefined);
@@ -66,7 +68,7 @@ function Dashboard() {
 
     let progress = 0;
     const animationInterval = setInterval(() => {
-      progress += 0.01; // Slower animation for better visualization
+      progress += 0.01;
       if (progress >= 1) {
         progress = 1;
         clearInterval(animationInterval);
@@ -87,8 +89,6 @@ function Dashboard() {
     }
   }, []);
 
-  const state = controller.getState();
-
   // Helper to get current step for telematics
   const getCurrentStep = () => {
     if (!rlRoute || !rlRoute.steps) return undefined;
@@ -96,8 +96,11 @@ function Dashboard() {
     return rlRoute.steps[stepIndex];
   };
 
+  const defaultVehicle: VehicleConstraints = { type: 'ev', maxRange: 200, currentRange: 150, capacity: 1000, maxDriveTime: 480 };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* ... header ... */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -128,6 +131,7 @@ function Dashboard() {
           <div className="lg:col-span-2 space-y-6">
             {/* Map Card */}
             <div className="bg-white rounded-lg shadow-lg p-6">
+              {/* ... map content ... */}
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-800">City Network Visualization</h2>
                 {isAnimating && (
@@ -138,8 +142,8 @@ function Dashboard() {
               </div>
               <div className="flex justify-center">
                 <CityMap
-                  graph={state.graph}
-                  environment={state.environment}
+                  graph={controller.getState().graph}
+                  environment={controller.getState().environment} // Use direct state access or prop
                   rlRoute={rlRoute}
                   dijkstraRoute={dijkstraRoute}
                   activeAlgorithm={activeAlgorithm}
@@ -148,38 +152,38 @@ function Dashboard() {
               </div>
             </div>
 
-            {/* Telematics Panel - Only show if we have a vehicle and route */}
-            {currentVehicle && rlRoute && (
-              <TelematicsPanel
-                vehicle={currentVehicle}
-                currentStep={getCurrentStep()}
-                totalDistance={rlRoute.totalDistance}
-                progress={animationProgress}
-              />
-            )}
+            {/* Telematics Panel - Always show if fleet or vehicle active */}
+            <TelematicsPanel
+              vehicle={currentVehicle || defaultVehicle}
+              currentStep={getCurrentStep()}
+              totalDistance={rlRoute?.totalDistance}
+              progress={animationProgress}
+              fleet={fleet}
+            />
 
-            <MetricsPanel rlRoute={rlRoute} dijkstraRoute={dijkstraRoute} />
+            <MetricsPanel rlRoute={rlRoute} dijkstraRoute={dijkstraRoute} constraints={currentConstraints} />
           </div>
 
           <div className="space-y-6">
+            {/* ... ControlPanel ... */}
             <ControlPanel
               onRunSimulation={handleRunSimulation}
               onUpdateEnvironment={handleUpdateEnvironment}
-              isTraining={state.isTraining}
-              trainingProgress={state.trainingProgress}
+              isTraining={controller.getState().isTraining}
+              trainingProgress={controller.getState().trainingProgress}
               activeAlgorithm={activeAlgorithm}
               onAlgorithmChange={setActiveAlgorithm}
-              rainLevel={state.environment.getRainLevel()}
-              weatherType={state.environment.getWeatherType()}
-              incidentCount={state.environment.getIncidentCount()}
+              rainLevel={controller.getState().environment.getRainLevel()}
+              weatherType={controller.getState().environment.getWeatherType()}
+              incidentCount={controller.getState().environment.getIncidentCount()}
               onTrafficChange={(val) => controller.setTrafficIntensity(val)}
               onRainChange={(val) => controller.setRainLevel(val)}
+              onCityChange={(city) => controller.setCity(city)}
             />
-
+            {/* ... other components ... */}
             <VoiceAssistant onCommand={handleVoiceCommand} />
-
-            <TrainingChart history={state.trainingHistory || []} />
-
+            <TrainingChart history={controller.getState().trainingHistory || []} />
+            {/* ... about ... */}
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h3 className="text-lg font-bold text-gray-800 mb-3">About This System</h3>
               <div className="text-sm text-gray-600 space-y-2">
@@ -200,12 +204,7 @@ function Dashboard() {
           </div>
         </div>
       </main>
-
-      <footer className="bg-white border-t mt-12">
-        <div className="max-w-7xl mx-auto px-6 py-4 text-center text-sm text-gray-600">
-          <p>Built for PS-001: Predictive Logistics AI Hackathon Challenge</p>
-        </div>
-      </footer>
+      {/* ... footer ... */}
     </div>
   );
 }

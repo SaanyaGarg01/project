@@ -63,15 +63,20 @@ export class QLearningAgent {
     // Blend current and predicted traffic
     const effectiveTraffic = (trafficFactor * 0.6) + (predictedTraffic * 0.4);
 
-    const baseFuelCost = edge.distance * 0.05;
-    const elevationCost = Math.max(0, edge.elevation * 0.05);
+    const baseTime = edge.distance / 60; // minutes
+    const timeCost = baseTime * effectiveTraffic * weatherImpact;
+
+    // Vehicle Specific Consumption Scaling
+    let consumptionMultiplier = 1.0; // Petrol
+    if (vehicle.type === 'ev') consumptionMultiplier = 0.2; // EVs are more efficient
+    if (vehicle.type === 'hybrid') consumptionMultiplier = 0.6; // Hybrids in between
+
+    const baseFuelCost = edge.distance * 0.05 * consumptionMultiplier;
+    const elevationCost = Math.max(0, edge.elevation * 0.05) * consumptionMultiplier;
     const fuelCost = (baseFuelCost + elevationCost) * effectiveTraffic * weatherImpact;
 
     // Check range constraint
     if (currentRange - fuelCost < 0) return -10000; // Impossible, run out of fuel
-
-    const baseTime = edge.distance / 60; // minutes
-    const timeCost = baseTime * effectiveTraffic * weatherImpact;
 
     // Check time window constraint (soft or hard depending on priority)
     const projectedArrival = currentTime + timeCost;
@@ -235,6 +240,7 @@ export class QLearningAgent {
       time: number;
       traffic: number;
       weather: number;
+      reason?: string;
     }> = [];
 
     let currentNode = start;
@@ -304,14 +310,17 @@ export class QLearningAgent {
       const edge = getEdge(this.graph, currentNode, nextNode)!;
 
       const trafficFactor = this.environment.getTrafficFactor(currentNode, nextNode);
-      const predictedTraffic = this.environment.getPredictedTraffic(currentNode, nextNode, 15);
       const weatherImpact = this.environment.getWeatherImpact(nextNode);
-
-      const baseFuelCost = edge.distance * 0.05;
-      const elevationCost = Math.max(0, edge.elevation * 0.05);
-      const segmentFuel = (baseFuelCost + elevationCost) * trafficFactor * weatherImpact;
-
       const segmentTime = (edge.distance / 60) * trafficFactor * weatherImpact;
+
+      // Vehicle Specific Consumption
+      let consumptionMultiplier = 1.0;
+      if (vehicle.type === 'ev') consumptionMultiplier = 0.2;
+      if (vehicle.type === 'hybrid') consumptionMultiplier = 0.6;
+
+      const baseFuelCost = edge.distance * 0.05 * consumptionMultiplier;
+      const elevationCost = Math.max(0, edge.elevation * 0.05) * consumptionMultiplier;
+      const segmentFuel = (baseFuelCost + elevationCost) * trafficFactor * weatherImpact;
 
       totalFuel += segmentFuel;
       totalTime += segmentTime;
@@ -342,7 +351,12 @@ export class QLearningAgent {
       if (currentRange <= 0) break;
     }
 
-    const co2Emissions = totalFuel * 2.31;
+    // Vehicle Specific CO2 calculation
+    let co2Factor = 2.31; // Petrol
+    if (vehicle.type === 'ev') co2Factor = 0.4; // Grid impact
+    if (vehicle.type === 'hybrid') co2Factor = 1.2;
+
+    const co2Emissions = totalFuel * co2Factor;
 
     return {
       path,

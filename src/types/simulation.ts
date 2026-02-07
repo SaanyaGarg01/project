@@ -104,3 +104,20 @@ export interface CityGraph {
   edges: Map<number, Edge[]>;
   adjacency: Map<number, number[]>;
 }
+
+export interface CityProfile {
+  name: string;
+  trafficVolatility: number; // 0-1
+  weatherRisk: number; // 0-1
+  averageSpeed: number; // km/h base
+  description: string;
+}
+
+export interface FleetVehicle extends VehicleConstraints {
+  id: string;
+  location: number; // Node ID
+  status: 'idle' | 'en-route' | 'charging' | 'breakdown';
+  route?: number[];
+  eta?: number; // minutes
+  stressIndex: number; // 0-10
+}

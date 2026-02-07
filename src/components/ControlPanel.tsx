@@ -19,6 +19,7 @@ interface ControlPanelProps {
   incidentCount: number;
   onTrafficChange: (val: number) => void;
   onRainChange: (val: number) => void;
+  onCityChange: (city: string) => void;
 }
 
 export function ControlPanel({
@@ -32,7 +33,8 @@ export function ControlPanel({
   weatherType,
   incidentCount,
   onTrafficChange,
-  onRainChange
+  onRainChange,
+  onCityChange
 }: ControlPanelProps) {
   const [startNode, setStartNode] = useState('0');
   const [goalNode, setGoalNode] = useState('63');
@@ -74,7 +76,18 @@ export function ControlPanel({
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 max-h-[80vh] overflow-y-auto">
-      <h2 className="text-xl font-bold text-gray-800 mb-6">Simulation Controls</h2>
+
+      <div className="bg-gradient-to-r from-blue-900 to-slate-900 -mx-6 -mt-6 p-4 rounded-t-lg mb-6 text-white">
+        <h2 className="text-lg font-bold">Simulation Controls</h2>
+        <div className="mt-3">
+          <label className="text-xs text-blue-200 uppercase font-bold tracking-wider block mb-1">Active City Profile</label>
+          <select onChange={(e) => onCityChange(e.target.value)} className="w-full bg-slate-800 border border-slate-600 text-white text-sm rounded p-2 focus:ring-2 focus:ring-blue-500">
+            <option value="Mumbai">Mumbai (High Traffic, Monsoon)</option>
+            <option value="Delhi">Delhi (Pollution Aware)</option>
+            <option value="Bangalore">Bangalore (Tech Hub, Signals)</option>
+          </select>
+        </div>
+      </div>
 
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
@@ -124,6 +137,28 @@ export function ControlPanel({
               <option value="critical">Critical (Ambulance)</option>
               <option value="low">Low (Eco)</option>
             </select>
+
+            <div className="flex items-center justify-between p-2 bg-emerald-50 rounded border border-emerald-100 mt-2">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+                <label className="text-xs font-bold text-emerald-800 cursor-pointer select-none">
+                  Ethical Mode
+                </label>
+              </div>
+              <div className="relative inline-block w-8 align-middle select-none">
+                <input type="checkbox" className="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-2 appearance-none cursor-pointer checked:right-0 checked:border-emerald-500 checked:bg-emerald-500 transition-all duration-300 top-0.5"
+                  onChange={(e) => {
+                    if (e.target.checked) onAlgorithmChange('rl');
+                  }} />
+                <div className="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></div>
+              </div>
+            </div>
+            <p className="text-[10px] text-emerald-600 mt-1 px-1">
+              Prioritizes safety & community impact over speed.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -331,6 +366,6 @@ export function ControlPanel({
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 }

@@ -1,23 +1,93 @@
-import { TrafficConditions, WeatherConditions, WeatherType, Incident, IncidentType } from '../types/simulation';
+import { WeatherConditions, WeatherType, Incident, IncidentType, CityProfile, FleetVehicle } from '../types/simulation';
+
+export const CITIES: Record<string, CityProfile> = {
+  Mumbai: { name: 'Mumbai', trafficVolatility: 0.9, weatherRisk: 0.8, averageSpeed: 20, description: 'High congestion, monsoon risk' },
+  Delhi: { name: 'Delhi', trafficVolatility: 0.7, weatherRisk: 0.4, averageSpeed: 35, description: 'Pollution awareness, wider roads' },
+  Bangalore: { name: 'Bangalore', trafficVolatility: 0.8, weatherRisk: 0.5, averageSpeed: 25, description: 'Tech hub, signal density' },
+};
 
 export class DynamicEnvironment {
-  private traffic: Map<string, number> = new Map();
-  private baseTrafficCongestion: number = 0.5; // Default base
-  private weather: WeatherConditions = {
+  public traffic: Map<string, number> = new Map();
+  private baseTrafficCongestion: number = 0.5;
+  public weather: WeatherConditions = {
     rain: 0,
     type: 'clear',
     floodZones: new Set(),
     visibility: 1.0
   };
-  private incidents: Incident[] = [];
+  public incidents: Incident[] = [];
   private updateInterval: number = 3000;
   private intervalId?: number;
-  private timeStep: number = 0; // consistent time tracking for predictive model
+  private timeStep: number = 0;
+
+  // New Modules
+  private activeCity: CityProfile = CITIES.Mumbai;
+  private fleet: FleetVehicle[] = [];
 
   constructor(private totalNodes: number) {
     this.initializeTraffic();
-    this.initializeWeather(); // Separate weather initialization
+    this.initializeWeather();
+    this.initializeFleet();
   }
+
+  setCity(cityName: string) {
+    if (CITIES[cityName]) {
+      this.activeCity = CITIES[cityName];
+      this.baseTrafficCongestion = this.activeCity.trafficVolatility;
+      this.setTrafficIntensity(this.activeCity.trafficVolatility); // Reset traffic
+      // Adjust weather based on city risk
+      this.weather.rain = Math.random() * this.activeCity.weatherRisk;
+      console.log(`Switched to ${cityName}`);
+    }
+  }
+
+  private initializeFleet() {
+    // Create initial simulated fleet
+    for (let i = 0; i < 5; i++) {
+      this.fleet.push({
+        id: `VH-${100 + i}`,
+        type: i % 2 === 0 ? 'ev' : 'petrol',
+        maxRange: i % 2 === 0 ? 300 : 600,
+        currentRange: i % 2 === 0 ? 250 : 500,
+        capacity: 1000,
+        maxDriveTime: 480,
+        location: Math.floor(Math.random() * this.totalNodes),
+        status: 'idle',
+        stressIndex: 0
+      });
+    }
+  }
+
+  getFleet(): FleetVehicle[] {
+    return this.fleet;
+  }
+
+  updateFleet() {
+    this.fleet.forEach(vehicle => {
+      if (vehicle.status === 'en-route' && vehicle.route && vehicle.route.length > 0) {
+        // Move vehicle
+        const nextNode = vehicle.route[0];
+        // Simple simulation: move one node per step if traffic permits
+        const currentTraffic = this.getTrafficFactor(vehicle.location, nextNode);
+        const moveChance = Math.max(0.1, 1 - currentTraffic);
+
+        if (Math.random() < moveChance) {
+          vehicle.location = nextNode;
+          vehicle.route.shift(); // Remove visited node
+          vehicle.currentRange -= 5; // Burn fuel/battery
+          vehicle.stressIndex = Math.max(0, Math.min(10, vehicle.stressIndex + (currentTraffic > 0.7 ? 1 : -0.5)));
+
+          if (vehicle.route.length === 0) {
+            vehicle.status = 'idle';
+          }
+        } else {
+          vehicle.stressIndex = Math.min(10, vehicle.stressIndex + 0.5); // Stuck in traffic
+        }
+      }
+    });
+  }
+
+  // ... existing methods ...
 
   private initializeTraffic(): void {
     for (let i = 0; i < this.totalNodes; i++) {

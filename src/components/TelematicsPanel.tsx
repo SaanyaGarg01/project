@@ -1,5 +1,5 @@
-import { Zap, Battery, AlertTriangle, TrendingDown } from 'lucide-react';
-import { RouteResult, VehicleConstraints } from '../types/simulation';
+import { Truck, AlertTriangle, TrendingDown, Battery, Zap } from 'lucide-react';
+import { FleetVehicle, VehicleConstraints } from '../types/simulation';
 
 interface TelematicsPanelProps {
     vehicle: VehicleConstraints;
@@ -12,15 +12,17 @@ interface TelematicsPanelProps {
         reason?: string;
     };
     totalDistance?: number;
-    progress: number; // 0-1
+    eta?: number;
+    fleet?: FleetVehicle[];
+    progress?: number;
 }
 
-export function TelematicsPanel({ vehicle, currentStep, totalDistance, progress }: TelematicsPanelProps) {
-    // ... (existing logic)
+export function TelematicsPanel({ vehicle, currentStep, totalDistance, fleet = [], progress = 0 }: TelematicsPanelProps) {
     const currentSpeed = currentStep
         ? (60 * (1 - currentStep.traffic * 0.5) * (1 - currentStep.weather * 0.3)).toFixed(0)
         : 0;
 
+    // Use vehicle prop for main display
     const currentConsumption = currentStep ? Math.abs(currentStep.fuel * 10).toFixed(1) : 0;
     const rangeRemaining = (vehicle.currentRange - (currentStep ? currentStep.fuel : 0)).toFixed(1);
 
@@ -33,7 +35,10 @@ export function TelematicsPanel({ vehicle, currentStep, totalDistance, progress 
                 <h2 className="text-lg font-bold text-green-400 flex items-center gap-2">
                     <Zap className="w-5 h-5" /> LIVE TELEMETRY
                 </h2>
-                <span className="text-xs text-slate-400 animate-pulse">● CONNECTED</span>
+                <div className="flex items-center gap-2">
+                    {fleet.length > 0 && <span className="text-xs text-blue-400 font-bold px-2 border border-blue-500 rounded">FLEET MODE</span>}
+                    <span className="text-xs text-slate-400 animate-pulse">● CONNECTED</span>
+                </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -108,7 +113,53 @@ export function TelematicsPanel({ vehicle, currentStep, totalDistance, progress 
                     </div>
                 </div>
 
+                {/* Driver Index */}
+                <div className="bg-slate-800 p-3 rounded border border-slate-700 col-span-2 flex items-center justify-between">
+                    <div>
+                        <span className="text-xs text-slate-400 block mb-1">DRIVER STRESS INDEX</span>
+                        <div className="w-32 bg-slate-700 h-2 rounded-full mt-1">
+                            <div
+                                className={`h-2 rounded-full transition-all duration-300 ${(currentStep?.traffic || 0) > 0.7 ? 'bg-red-500' : 'bg-green-500'}`}
+                                style={{ width: `${Math.min(100, (currentStep?.traffic || 0) * 100)}%` }}
+                            ></div>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <span className={`text-xl font-bold ${(currentStep?.traffic || 0) > 0.7 ? 'text-red-400' : 'text-green-400'}`}>
+                            {((currentStep?.traffic || 0) * 10).toFixed(1)}/10
+                        </span>
+                        <span className="text-xs text-slate-500 block">
+                            {(currentStep?.traffic || 0) > 0.7 ? 'Stop-and-Go' : 'Smooth Flow'}
+                        </span>
+                    </div>
+                </div>
+
             </div>
+
+            {/* Fleet Section */}
+            {fleet.length > 0 && (
+                <div className="mt-4 border-t border-slate-700 pt-3">
+                    <h3 className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-2 uppercase tracking-wider">
+                        <Truck className="w-3 h-3" /> Active Fleet Status
+                    </h3>
+                    <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                        {fleet.map(v => (
+                            <div key={v.id} className="flex items-center justify-between p-2 bg-slate-800 rounded border border-slate-700 text-[10px]">
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${v.status === 'en-route' ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}></div>
+                                    <span className="font-semibold text-slate-300">{v.id}</span>
+                                    <span className={`px-1 rounded uppercase ${v.type === 'ev' ? 'bg-green-900 text-green-300' : 'bg-orange-900 text-orange-300'}`}>{v.type}</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-slate-400">
+                                    <span>Loc: {v.location}</span>
+                                    <span className={`${v.stressIndex > 7 ? 'text-red-400 font-bold' : ''}`}>Stress: {v.stressIndex.toFixed(0)}</span>
+                                    <span>{v.currentRange}km</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-2 gap-4">
                 <div>
@@ -119,8 +170,7 @@ export function TelematicsPanel({ vehicle, currentStep, totalDistance, progress 
                 </div>
                 <div>
                     <span className="text-xs text-slate-400 block mb-1">STATUS</span>
-                    <span className={`text-sm font-bold px-2 py-1 rounded ${currentStep && currentStep.traffic > 0.8 ? 'bg-red-900/50 text-red-400' : 'bg-green-900/50 text-green-400'
-                        }`}>
+                    <span className={`text-sm font-bold px-2 py-1 rounded ${currentStep && currentStep.traffic > 0.8 ? 'bg-red-900/50 text-red-400' : 'bg-green-900/50 text-green-400'}`}>
                         {currentStep && currentStep.traffic > 0.8 ? 'DELAYED' : 'ON TIME'}
                     </span>
                 </div>
