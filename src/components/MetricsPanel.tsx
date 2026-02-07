@@ -1,13 +1,15 @@
 import { RouteResult, DeliveryConstraint } from '../types/simulation';
-import { Clock, Gauge, Leaf, Award, AlertTriangle } from 'lucide-react';
+import { Clock, Gauge, Leaf, Award, AlertTriangle, Zap } from 'lucide-react';
 
 interface MetricsPanelProps {
   rlRoute?: RouteResult;
   dijkstraRoute?: RouteResult;
   constraints?: DeliveryConstraint | null;
+  rainLevel: number;
+  trafficLevel: number;
 }
 
-export function MetricsPanel({ rlRoute, dijkstraRoute, constraints }: MetricsPanelProps) {
+export function MetricsPanel({ rlRoute, dijkstraRoute, constraints, rainLevel, trafficLevel }: MetricsPanelProps) {
   if (!rlRoute || !dijkstraRoute) {
     return (
       <div className="bg-white rounded-lg shadow-lg p-6">
@@ -164,22 +166,62 @@ export function MetricsPanel({ rlRoute, dijkstraRoute, constraints }: MetricsPan
         </div>
       </div>
 
-      <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
-        <h3 className="text-sm font-bold text-green-800 mb-3 flex items-center gap-2">
-          <Leaf className="w-4 h-4" /> Business Value
+      {/* Predictive Analytics Section */}
+      <div className="mt-6 border-t pt-6">
+        <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <Zap className="w-4 h-4 text-amber-500" /> Predictive Intelligence Forecast
+        </h3>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className={`p-3 rounded-xl border ${rainLevel > 0.6 || trafficLevel > 0.7 ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'}`}>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Risk Profile</span>
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-black ${rainLevel > 0.6 || trafficLevel > 0.7 ? 'text-red-600' : 'text-slate-700'}`}>
+                {rainLevel > 0.8 ? 'CRITICAL (FLOOD)' : rainLevel > 0.4 || trafficLevel > 0.6 ? 'ELEVATED RISK' : 'STABLE URBAN'}
+              </span>
+            </div>
+            <p className="text-[9px] text-slate-500 mt-1">
+              {rainLevel > 0.5 ? 'Active monsoon impacting brake distance.' : 'Current conditions allow optimal speed.'}
+            </p>
+          </div>
+
+          <div className="p-3 rounded-xl border bg-slate-50 border-slate-100">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Consumption Forecast</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-black text-slate-700">
+                +{((rainLevel * 0.4) + (trafficLevel * 0.3) * 100).toFixed(0)}% Var.
+              </span>
+              <div className="h-1.5 w-12 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-slate-800"
+                  style={{ width: `${Math.min(100, (rainLevel * 40) + (trafficLevel * 30))}%` }}
+                />
+              </div>
+            </div>
+            <p className="text-[9px] text-slate-500 mt-1">Reflecting real-time playground shifts.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 p-4 bg-green-900 rounded-xl shadow-inner shadow-green-950/20">
+        <h3 className="text-sm font-bold text-green-50 mb-3 flex items-center gap-2">
+          <Leaf className="w-4 h-4 text-green-400" /> Executive Business Value
         </h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <span className="text-xs text-green-600 block mb-1">ESTIMATED TRIP SAVINGS</span>
-            <span className={`text-lg font-bold ${fuelImprovement >= 0 ? 'text-green-900' : 'text-red-700'}`}>
+            <span className="text-[10px] text-green-300 font-bold uppercase tracking-wider block mb-1">Total Trip Impact</span>
+            <span className={`text-lg font-black ${fuelImprovement >= 0 ? 'text-white' : 'text-red-300'}`}>
               ₹{Math.abs(fuelImprovement / 100 * dijkstraRoute.totalFuel * 105).toFixed(2)}
             </span>
-            <span className="text-xs text-green-700 ml-1">{fuelImprovement >= 0 ? 'Saved' : 'Efficiency Loss'}</span>
+            <span className="text-[9px] text-green-400 ml-1 block">
+              {fuelImprovement >= 0 ? 'Cost Avoidance' : 'Efficiency Loss'}
+            </span>
           </div>
-          <div>
-            <span className="text-xs text-green-600 block mb-1">ECO SCORE</span>
-            <div className="text-lg font-bold text-green-900">
-              {Math.max(0, Math.min(100, 50 + fuelImprovement)).toFixed(0)}/100
+          <div className="text-right">
+            <span className="text-[10px] text-green-300 font-bold uppercase tracking-wider block mb-1">Fleet Eco Score</span>
+            <div className="text-2xl font-black text-white">
+              {Math.max(0, Math.min(100, 50 + fuelImprovement - (rainLevel * 10))).toFixed(0)}
+              <span className="text-xs text-green-400">/100</span>
             </div>
           </div>
         </div>

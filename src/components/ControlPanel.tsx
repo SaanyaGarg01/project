@@ -16,6 +16,8 @@ interface ControlPanelProps {
   goalNode: string;
   onStartNodeChange: (val: string) => void;
   onGoalNodeChange: (val: string) => void;
+  onTrafficChange: (val: number) => void;
+  onRainChange: (val: number) => void;
 
   // Lifted States
   priority: PriorityLevel;
@@ -54,8 +56,18 @@ export function ControlPanel({
   weight,
   onWeightChange,
   vehicleType,
-  onVehicleTypeChange
+  onVehicleTypeChange,
+  onTrafficChange,
+  onRainChange
 }: ControlPanelProps) {
+
+  // Local helper for Risk Calculation
+  const getRiskColor = (traffic: number, rain: number) => {
+    const score = (traffic * 0.5) + (rain * 0.5);
+    if (score > 0.7) return 'text-red-600';
+    if (score > 0.4) return 'text-orange-500';
+    return 'text-green-600';
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 max-h-[80vh] overflow-y-auto">
@@ -203,34 +215,51 @@ export function ControlPanel({
 
         <div className="border-t pt-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-            <Zap className="w-4 h-4 text-purple-600" /> Interactive Playground
+            <Zap className="w-4 h-4 text-purple-600" /> Dynamic Logistics Playground
           </h3>
           <div className="space-y-4">
             <div>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-gray-600">Base Traffic Congestion</span>
-                <span className="font-semibold">{Math.round(0.5 * 100)}% (drag to change)</span>
+              <div className="flex justify-between text-[10px] mb-1">
+                <span className="text-gray-500 uppercase font-bold tracking-widest text-[9px]">Congestion Index</span>
+                <span className={`font-black ${getRiskColor(0.5, rainLevel)}`}>{(0.5 * 100).toFixed(0)}% Impact</span>
               </div>
               <input
                 type="range"
                 min="0"
                 max="100"
                 defaultValue="50"
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                onChange={(e) => onTrafficChange(parseInt(e.target.value) / 100)}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-slate-800"
               />
             </div>
             <div>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-gray-600">Rain Intensity</span>
-                <span className="font-semibold">{Math.round(rainLevel * 100)}%</span>
+              <div className="flex justify-between text-[10px] mb-1">
+                <span className="text-gray-500 uppercase font-bold tracking-widest text-[9px]">Monsoon Intensity</span>
+                <span className={`font-black ${getRiskColor(0.5, rainLevel)}`}>{(rainLevel * 100).toFixed(0)}% Severity</span>
               </div>
               <input
                 type="range"
                 min="0"
                 max="100"
-                defaultValue={rainLevel * 100}
-                className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                value={rainLevel * 100}
+                onChange={(e) => onRainChange(parseInt(e.target.value) / 100)}
+                className="w-full h-2 bg-blue-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
               />
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="p-2 border rounded-lg bg-slate-50">
+              <span className="block text-[8px] text-slate-400 font-bold uppercase">Real-Time Risk</span>
+              <span className={`text-sm font-black ${getRiskColor(0.5, rainLevel)}`}>
+                {rainLevel > 0.7 ? 'HIGH ALARM' : rainLevel > 0.4 ? 'MODERATE' : 'OPTIMAL'}
+              </span>
+            </div>
+            <div className="p-2 border rounded-lg bg-slate-50">
+              <span className="block text-[8px] text-slate-400 font-bold uppercase">Cons. Multiplier</span>
+              <span className="text-sm font-black text-slate-800">
+                {(1 + (rainLevel * 0.5) + (0.5 * 0.3)).toFixed(1)}x
+              </span>
             </div>
           </div>
         </div>
@@ -271,6 +300,7 @@ export function ControlPanel({
         </div>
 
         <button
+          id="run-sim-btn"
           onClick={onRunSimulation}
           disabled={isTraining}
           className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-md font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"

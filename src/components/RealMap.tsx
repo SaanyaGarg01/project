@@ -40,6 +40,149 @@ interface RealMapProps {
     trainingProgress?: number;
 }
 
+interface GeoControlsProps {
+    startQuery: string;
+    setStartQuery: (val: string) => void;
+    goalQuery: string;
+    setGoalQuery: (val: string) => void;
+    onRunSimulation: () => void;
+    startSuggestions: SearchResult[];
+    setStartSuggestions: (results: SearchResult[]) => void;
+    goalSuggestions: SearchResult[];
+    setGoalSuggestions: (results: SearchResult[]) => void;
+    searchLocation: (query: string, setResults: (results: SearchResult[]) => void) => void;
+    handleSelectLocation: (result: SearchResult, type: 'start' | 'goal', map: L.Map) => void;
+    selectionMode: 'none' | 'start' | 'goal';
+    setSelectionMode: (mode: 'none' | 'start' | 'goal') => void;
+    selectedBounds: L.LatLngBounds | null;
+}
+
+// DEFINED OUTSIDE TO PREVENT RE-MOUNTING ON STATE CHANGE (FIXES FOCUS LOSS)
+function GeoControls({
+    startQuery, setStartQuery,
+    goalQuery, setGoalQuery,
+    onRunSimulation,
+    startSuggestions, setStartSuggestions,
+    goalSuggestions, setGoalSuggestions,
+    searchLocation, handleSelectLocation,
+    selectionMode, setSelectionMode,
+    selectedBounds
+}: GeoControlsProps) {
+    const map = useMap();
+
+    return (
+        <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-3 w-80 pointer-events-none">
+            <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-2xl p-4 border border-blue-100 pointer-events-auto transition-all hover:border-blue-300">
+                <div className="flex items-center justify-between mb-4 text-blue-900 border-b border-blue-50 pb-2">
+                    <div className="flex items-center gap-2">
+                        <MapIcon className="w-5 h-5" />
+                        <h3 className="font-bold text-sm tracking-tight">Geo-routing Control</h3>
+                    </div>
+                    {startQuery && goalQuery && (
+                        <button
+                            onClick={onRunSimulation}
+                            className="bg-blue-600 text-white px-3 py-1 rounded-full text-[10px] font-black hover:bg-blue-700 animate-pulse shadow-lg"
+                        >
+                            RUN AI
+                        </button>
+                    )}
+                </div>
+
+                <div className="space-y-4">
+                    <div className="relative">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Pick Up Point</label>
+                        <div className="relative flex items-center">
+                            <MapPin className="absolute left-3 w-4 h-4 text-green-500" />
+                            <input
+                                type="text"
+                                placeholder="Type city or address..."
+                                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none transition-all placeholder:text-slate-400"
+                                value={startQuery}
+                                onChange={(e) => {
+                                    setStartQuery(e.target.value);
+                                    searchLocation(e.target.value, setStartSuggestions);
+                                }}
+                            />
+                            {startQuery && (
+                                <button onClick={() => { setStartQuery(''); setStartSuggestions([]); }} className="absolute right-3 p-1 hover:bg-slate-200 rounded-full transition-colors">
+                                    <X className="w-3 h-3 text-slate-500" />
+                                </button>
+                            )}
+                        </div>
+                        {startSuggestions.length > 0 && (
+                            <div className="absolute w-full mt-1 bg-white rounded-lg shadow-xl border border-slate-100 z-[1001] max-h-48 overflow-y-auto">
+                                {startSuggestions.map((s, i) => (
+                                    <div
+                                        key={i}
+                                        className="px-3 py-2 text-xs hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+                                        onClick={() => handleSelectLocation(s, 'start', map)}
+                                    >
+                                        {s.display_name}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="relative">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Drop Off Goal</label>
+                        <div className="relative flex items-center">
+                            <Target className="absolute left-3 w-4 h-4 text-red-500" />
+                            <input
+                                type="text"
+                                placeholder="Destination location..."
+                                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500 outline-none transition-all placeholder:text-slate-400"
+                                value={goalQuery}
+                                onChange={(e) => {
+                                    setGoalQuery(e.target.value);
+                                    searchLocation(e.target.value, setGoalSuggestions);
+                                }}
+                            />
+                            {goalQuery && (
+                                <button onClick={() => { setGoalQuery(''); setGoalSuggestions([]); }} className="absolute right-3 p-1 hover:bg-slate-200 rounded-full transition-colors">
+                                    <X className="w-3 h-3 text-slate-500" />
+                                </button>
+                            )}
+                        </div>
+                        {goalSuggestions.length > 0 && (
+                            <div className="absolute w-full mt-1 bg-white rounded-lg shadow-xl border border-slate-100 z-[1001] max-h-48 overflow-y-auto">
+                                {goalSuggestions.map((s, i) => (
+                                    <div
+                                        key={i}
+                                        className="px-3 py-2 text-xs hover:bg-red-50 cursor-pointer border-b border-slate-50 last:border-0"
+                                        onClick={() => handleSelectLocation(s, 'goal', map)}
+                                    >
+                                        {s.display_name}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {selectedBounds && (
+                <div className="flex gap-2 pointer-events-auto">
+                    <button
+                        onClick={() => setSelectionMode('start')}
+                        className={`flex-1 py-3 px-4 rounded-xl shadow-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${selectionMode === 'start' ? 'bg-green-600 text-white ring-4 ring-green-100' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
+                    >
+                        <MapPin className="w-4 h-4" />
+                        PICK MAP START
+                    </button>
+                    <button
+                        onClick={() => setSelectionMode('goal')}
+                        className={`flex-1 py-3 px-4 rounded-xl shadow-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${selectionMode === 'goal' ? 'bg-red-600 text-white ring-4 ring-red-100' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
+                    >
+                        <Target className="w-4 h-4" />
+                        PICK MAP GOAL
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // DEFINING OUTSIDE COMPONENT TO PREVENT RE-MOUNTING ON STATE CHANGE
 function RouteLayer({
     activeAlgorithm,
@@ -54,7 +197,7 @@ function RouteLayer({
 }) {
     return (
         <>
-            {/* Draw Route Polylines */}
+            {/* Full Background Path (Subtle) */}
             {(activeAlgorithm === 'both' || activeAlgorithm === 'rl') && rlRoute && (
                 <Polyline
                     positions={getRoutePoints(rlRoute, true)}
@@ -62,6 +205,7 @@ function RouteLayer({
                 />
             )}
 
+            {/* Animated RL Path (Heavy) */}
             {(activeAlgorithm === 'both' || activeAlgorithm === 'rl') && rlRoute && (
                 <Polyline
                     positions={getRoutePoints(rlRoute)}
@@ -95,6 +239,7 @@ function RouteLayer({
                 />
             )}
 
+            {/* Baseline Path */}
             {(activeAlgorithm === 'both' || activeAlgorithm === 'dijkstra') && dijkstraRoute && (
                 <Polyline
                     positions={getRoutePoints(dijkstraRoute, true)}
@@ -129,7 +274,7 @@ export function RealMap({
 
     const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    const searchLocation = async (query: string, setResults: (results: SearchResult[]) => void) => {
+    const searchLocation = useCallback(async (query: string, setResults: (results: SearchResult[]) => void) => {
         if (query.length < 3) {
             setResults([]);
             return;
@@ -140,7 +285,8 @@ export function RealMap({
         searchTimeoutRef.current = setTimeout(async () => {
             setIsSearching(true);
             try {
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=in&limit=5`);
+                // Removed country restriction and increased limit for 'any location' support
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=10&addressdetails=1`);
                 const data = await response.json();
                 setResults(data);
             } catch (error) {
@@ -149,9 +295,9 @@ export function RealMap({
                 setIsSearching(false);
             }
         }, 800);
-    };
+    }, []);
 
-    const handleSelectLocation = (result: SearchResult, type: 'start' | 'goal', map: L.Map) => {
+    const handleSelectLocation = useCallback((result: SearchResult, type: 'start' | 'goal', map: L.Map) => {
         const lat = parseFloat(result.lat);
         const lon = parseFloat(result.lon);
         const coords = L.latLng(lat, lon);
@@ -172,23 +318,34 @@ export function RealMap({
             );
             onAreaSelected(newBounds);
             map.flyTo(coords, 13);
+
+            // On first geocode, select Node 0 (Top-left) or Node 27 (Center) to initialize state
+            onNodeSelected(type === 'start' ? 0 : 63, type);
         } else {
             const sw = selectedBounds.getSouthWest();
             const ne = selectedBounds.getNorthEast();
-            const xRel = (lon - sw.lng) / (ne.lng - sw.lng);
-            const yRel = (lat - sw.lat) / (ne.lat - sw.lat);
 
-            if (xRel < 0 || xRel > 1 || yRel < 0 || yRel > 1) {
-                const currentCenter = selectedBounds.getCenter();
-                const newBounds = L.latLngBounds(currentCenter, coords).pad(0.2);
+            // Check if coordinates are inside current bounds, if not expand
+            if (!selectedBounds.contains(coords)) {
+                const newBounds = selectedBounds.extend(coords).pad(0.1);
                 onAreaSelected(newBounds);
+                // After expansion, we need to recalculate xRel/yRel based on NEW bounds
+                const nsw = newBounds.getSouthWest();
+                const nne = newBounds.getNorthEast();
+                const xRel = (lon - nsw.lng) / (nne.lng - nsw.lng);
+                const yRel = (lat - nsw.lat) / (nne.lat - nsw.lat);
+                const col = Math.max(0, Math.min(7, Math.round(xRel * 7)));
+                const row = Math.max(0, Math.min(7, Math.round(yRel * 7)));
+                onNodeSelected(row * 8 + col, type);
+            } else {
+                const xRel = (lon - sw.lng) / (ne.lng - sw.lng);
+                const yRel = (lat - sw.lat) / (ne.lat - sw.lat);
+                const col = Math.max(0, Math.min(7, Math.round(xRel * 7)));
+                const row = Math.max(0, Math.min(7, Math.round(yRel * 7)));
+                onNodeSelected(row * 8 + col, type);
             }
-
-            const col = Math.max(0, Math.min(7, Math.round(xRel * 7)));
-            const row = Math.max(0, Math.min(7, Math.round(yRel * 7)));
-            onNodeSelected(row * 8 + col, type);
         }
-    };
+    }, [selectedBounds, onAreaSelected, onNodeSelected]);
 
     const transformToMap = useCallback((x: number, y: number): [number, number] => {
         if (!selectedBounds) return [0, 0];
@@ -262,111 +419,6 @@ export function RealMap({
         return points;
     }, [graph.nodes, animationProgress, transformToMap]);
 
-    const SearchPanel = () => {
-        const map = useMap();
-        return (
-            <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-3 w-80 pointer-events-none">
-                <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-2xl p-4 border border-blue-100 pointer-events-auto transition-all hover:border-blue-300">
-                    <div className="flex items-center gap-2 mb-4 text-blue-900 border-b border-blue-50 pb-2">
-                        <MapIcon className="w-5 h-5" />
-                        <h3 className="font-bold text-sm tracking-tight">Geo-routing Control</h3>
-                    </div>
-
-                    <div className="space-y-4">
-                        <div className="relative">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Pick Up Point</label>
-                            <div className="relative flex items-center">
-                                <MapPin className="absolute left-3 w-4 h-4 text-green-500" />
-                                <input
-                                    type="text"
-                                    placeholder="Type city or address..."
-                                    className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none transition-all placeholder:text-slate-400"
-                                    value={startQuery}
-                                    onChange={(e) => {
-                                        setStartQuery(e.target.value);
-                                        searchLocation(e.target.value, setStartSuggestions);
-                                    }}
-                                />
-                                {startQuery && (
-                                    <button onClick={() => { setStartQuery(''); setStartSuggestions([]); }} className="absolute right-3 p-1 hover:bg-slate-200 rounded-full transition-colors">
-                                        <X className="w-3 h-3 text-slate-500" />
-                                    </button>
-                                )}
-                            </div>
-                            {startSuggestions.length > 0 && (
-                                <div className="absolute w-full mt-1 bg-white rounded-lg shadow-xl border border-slate-100 z-[1001] max-h-48 overflow-y-auto">
-                                    {startSuggestions.map((s, i) => (
-                                        <div
-                                            key={i}
-                                            className="px-3 py-2 text-xs hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
-                                            onClick={() => handleSelectLocation(s, 'start', map)}
-                                        >
-                                            {s.display_name}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="relative">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Drop Off Goal</label>
-                            <div className="relative flex items-center">
-                                <Target className="absolute left-3 w-4 h-4 text-red-500" />
-                                <input
-                                    type="text"
-                                    placeholder="Destination location..."
-                                    className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500 outline-none transition-all placeholder:text-slate-400"
-                                    value={goalQuery}
-                                    onChange={(e) => {
-                                        setGoalQuery(e.target.value);
-                                        searchLocation(e.target.value, setGoalSuggestions);
-                                    }}
-                                />
-                                {goalQuery && (
-                                    <button onClick={() => { setGoalQuery(''); setGoalSuggestions([]); }} className="absolute right-3 p-1 hover:bg-slate-200 rounded-full transition-colors">
-                                        <X className="w-3 h-3 text-slate-500" />
-                                    </button>
-                                )}
-                            </div>
-                            {goalSuggestions.length > 0 && (
-                                <div className="absolute w-full mt-1 bg-white rounded-lg shadow-xl border border-slate-100 z-[1001] max-h-48 overflow-y-auto">
-                                    {goalSuggestions.map((s, i) => (
-                                        <div
-                                            key={i}
-                                            className="px-3 py-2 text-xs hover:bg-red-50 cursor-pointer border-b border-slate-50 last:border-0"
-                                            onClick={() => handleSelectLocation(s, 'goal', map)}
-                                        >
-                                            {s.display_name}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {selectedBounds && (
-                    <div className="flex gap-2 pointer-events-auto">
-                        <button
-                            onClick={() => setSelectionMode('start')}
-                            className={`flex-1 py-3 px-4 rounded-xl shadow-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${selectionMode === 'start' ? 'bg-green-600 text-white ring-4 ring-green-100' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
-                        >
-                            <MapPin className="w-4 h-4" />
-                            PICK MAP START
-                        </button>
-                        <button
-                            onClick={() => setSelectionMode('goal')}
-                            className={`flex-1 py-3 px-4 rounded-xl shadow-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${selectionMode === 'goal' ? 'bg-red-600 text-white ring-4 ring-red-100' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
-                        >
-                            <Target className="w-4 h-4" />
-                            PICK MAP GOAL
-                        </button>
-                    </div>
-                )}
-            </div>
-        );
-    };
-
     return (
         <div className="relative w-full h-[650px] rounded-2xl overflow-hidden border-4 border-white shadow-2xl bg-slate-100 group">
             <MapContainer
@@ -382,7 +434,28 @@ export function RealMap({
                 />
 
                 <MapEvents />
-                <SearchPanel />
+
+                <GeoControls
+                    startQuery={startQuery}
+                    setStartQuery={setStartQuery}
+                    goalQuery={goalQuery}
+                    setGoalQuery={setGoalQuery}
+                    onRunSimulation={() => {
+                        // Expose simulation trigger to search panel
+                        const start = graph.nodes.get(startNode);
+                        const goal = graph.nodes.get(goalNode);
+                        if (start && goal) document.getElementById('run-sim-btn')?.click();
+                    }}
+                    startSuggestions={startSuggestions}
+                    setStartSuggestions={setStartSuggestions}
+                    goalSuggestions={goalSuggestions}
+                    setGoalSuggestions={setGoalSuggestions}
+                    searchLocation={searchLocation}
+                    handleSelectLocation={handleSelectLocation}
+                    selectionMode={selectionMode}
+                    setSelectionMode={setSelectionMode}
+                    selectedBounds={selectedBounds}
+                />
 
                 {selectedBounds && (
                     <Rectangle

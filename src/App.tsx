@@ -135,6 +135,16 @@ function Dashboard() {
     }
   }, []);
 
+  const handleTrafficChange = useCallback((level: number) => {
+    controller.setTrafficIntensity(level);
+    setUpdateTrigger(prev => prev + 1);
+  }, []);
+
+  const handleRainChange = useCallback((level: number) => {
+    controller.setRainLevel(level);
+    setUpdateTrigger(prev => prev + 1);
+  }, []);
+
   // Helper to get current step for telematics
   const getCurrentStep = () => {
     if (!rlRoute || !rlRoute.steps) return undefined;
@@ -211,19 +221,22 @@ function Dashboard() {
                     goalNode={parseInt(goalNode)}
                     onNodeSelected={(id, type) => {
                       const newId = id.toString();
-                      if (type === 'start') setStartNode(newId);
-                      else {
+                      if (type === 'start') {
+                        setStartNode(newId);
+                      } else {
                         setGoalNode(newId);
-                        // Auto-trigger simulation immediately
-                        executeSimulation(
-                          parseInt(startNode),
-                          id,
-                          priority,
-                          windowStart,
-                          windowEnd,
-                          weight,
-                          vehicleType
-                        );
+                        // Auto-trigger only if we have a valid start node that isn't the same as goal
+                        if (startNode !== newId) {
+                          executeSimulation(
+                            parseInt(startNode),
+                            id,
+                            priority,
+                            windowStart,
+                            windowEnd,
+                            weight,
+                            vehicleType
+                          );
+                        }
                       }
                     }}
                     isTraining={controller.getState().isTraining}
@@ -251,7 +264,13 @@ function Dashboard() {
               fleet={fleet}
             />
 
-            <MetricsPanel rlRoute={rlRoute} dijkstraRoute={dijkstraRoute} constraints={currentConstraints} />
+            <MetricsPanel
+              rlRoute={rlRoute}
+              dijkstraRoute={dijkstraRoute}
+              constraints={currentConstraints}
+              rainLevel={controller.getState().environment.getRainLevel()}
+              trafficLevel={0.5} // Using base level from playground
+            />
           </div>
 
           <div className="space-y-6">
@@ -281,6 +300,8 @@ function Dashboard() {
               onWeightChange={setWeight}
               vehicleType={vehicleType}
               onVehicleTypeChange={setVehicleType}
+              onTrafficChange={handleTrafficChange}
+              onRainChange={handleRainChange}
             />
             {/* ... other components ... */}
             <VoiceAssistant onCommand={handleVoiceCommand} />
