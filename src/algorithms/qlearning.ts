@@ -1,6 +1,7 @@
 import { CityGraph, Edge, RouteResult, DeliveryConstraint, VehicleConstraints } from '../types/simulation';
 import { DynamicEnvironment } from '../simulation/environment';
 import { getEdge } from '../simulation/cityGraph';
+import { getConsumptionMultiplier, calculateSegmentFuel, calculateCO2 } from '../utils/fuelCalculator';
 
 interface QState {
   node: number;
@@ -66,11 +67,7 @@ export class QLearningAgent {
     const baseTime = edge.distance * 0.002; // 30km/h scale
     const timeCost = baseTime * effectiveTraffic * weatherImpact;
 
-    // Vehicle Specific Consumption Scaling
-    let consumptionMultiplier = 1.0; // Petrol
-    if (vehicle.type === 'ev') consumptionMultiplier = 0.2; // EVs are more efficient
-    if (vehicle.type === 'hybrid') consumptionMultiplier = 0.6; // Hybrids in between
-
+    const consumptionMultiplier = getConsumptionMultiplier(vehicle.type);
     const baseFuelCost = edge.distance * 0.00025 * consumptionMultiplier;
     const elevationCost = Math.max(0, edge.elevation * 0.0001) * consumptionMultiplier;
     const fuelCost = (baseFuelCost + elevationCost) * effectiveTraffic * weatherImpact;
@@ -313,14 +310,7 @@ export class QLearningAgent {
       const weatherImpact = this.environment.getWeatherImpact(nextNode);
       const segmentTime = edge.distance * 0.002 * trafficFactor * weatherImpact;
 
-      // Vehicle Specific Consumption
-      let consumptionMultiplier = 1.0;
-      if (vehicle.type === 'ev') consumptionMultiplier = 0.2;
-      if (vehicle.type === 'hybrid') consumptionMultiplier = 0.6;
-
-      const baseFuelCost = edge.distance * 0.00025 * consumptionMultiplier;
-      const elevationCost = Math.max(0, edge.elevation * 0.0001) * consumptionMultiplier;
-      const segmentFuel = (baseFuelCost + elevationCost) * trafficFactor * weatherImpact;
+      const segmentFuel = calculateSegmentFuel(edge, trafficFactor, weatherImpact, vehicle.type);
 
       totalFuel += segmentFuel;
       totalTime += segmentTime;
@@ -351,12 +341,7 @@ export class QLearningAgent {
       if (currentRange <= 0) break;
     }
 
-    // Vehicle Specific CO2 calculation
-    let co2Factor = 2.31; // Petrol
-    if (vehicle.type === 'ev') co2Factor = 0.4; // Grid impact
-    if (vehicle.type === 'hybrid') co2Factor = 1.2;
-
-    const co2Emissions = totalFuel * co2Factor;
+    const co2Emissions = calculateCO2(totalFuel, vehicle.type);
 
     return {
       path,
