@@ -3,7 +3,7 @@ import { DynamicEnvironment } from './environment';
 import { QLearningAgent } from '../algorithms/qlearning';
 import { DijkstraRouter } from '../algorithms/dijkstra';
 import { RouteResult, CityGraph, DeliveryConstraint, VehicleConstraints } from '../types/simulation';
-import { supabase } from '../lib/supabase';
+import { simulationRunsRef, addDoc, Timestamp } from '../lib/firebase';
 
 export interface SimulationState {
   graph: CityGraph;
@@ -113,7 +113,7 @@ export class SimulationController {
     try {
       const envSnapshot = this.state.environment.getSnapshot();
 
-      await supabase.from('simulation_runs').insert({
+      await addDoc(simulationRunsRef, {
         algorithm,
         start_node: start,
         end_node: goal,
@@ -127,7 +127,8 @@ export class SimulationController {
         weather_conditions: {
           rain: envSnapshot.weather.rain,
           flood_zones: Array.from(envSnapshot.weather.floodZones)
-        }
+        },
+        created_at: Timestamp.now()
       });
     } catch (error) {
       console.error('Error saving simulation run:', error);

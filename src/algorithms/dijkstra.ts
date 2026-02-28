@@ -1,21 +1,56 @@
 import { CityGraph, RouteResult, VehicleConstraints, DeliveryConstraint } from '../types/simulation';
 import { DynamicEnvironment } from '../simulation/environment';
 import { getEdge } from '../simulation/cityGraph';
+import { calculateSegmentFuel, calculateSegmentTime, calculateCO2 } from '../utils/fuelCalculator';
 
+/**
+ * Binary Min-Heap PriorityQueue — O(log n) insert/extract
+ * Replaces the naive sort-based approach which was O(n log n) per insert.
+ */
 class PriorityQueue<T> {
-  private items: Array<{ element: T; priority: number }> = [];
+  private heap: Array<{ element: T; priority: number }> = [];
 
   enqueue(element: T, priority: number): void {
-    this.items.push({ element, priority });
-    this.items.sort((a, b) => a.priority - b.priority);
+    this.heap.push({ element, priority });
+    this._bubbleUp(this.heap.length - 1);
   }
 
   dequeue(): T | undefined {
-    return this.items.shift()?.element;
+    if (this.heap.length === 0) return undefined;
+    const top = this.heap[0];
+    const last = this.heap.pop()!;
+    if (this.heap.length > 0) {
+      this.heap[0] = last;
+      this._sinkDown(0);
+    }
+    return top.element;
   }
 
   isEmpty(): boolean {
-    return this.items.length === 0;
+    return this.heap.length === 0;
+  }
+
+  private _bubbleUp(idx: number): void {
+    while (idx > 0) {
+      const parent = Math.floor((idx - 1) / 2);
+      if (this.heap[parent].priority <= this.heap[idx].priority) break;
+      [this.heap[parent], this.heap[idx]] = [this.heap[idx], this.heap[parent]];
+      idx = parent;
+    }
+  }
+
+  private _sinkDown(idx: number): void {
+    const length = this.heap.length;
+    while (true) {
+      let smallest = idx;
+      const left = 2 * idx + 1;
+      const right = 2 * idx + 2;
+      if (left < length && this.heap[left].priority < this.heap[smallest].priority) smallest = left;
+      if (right < length && this.heap[right].priority < this.heap[smallest].priority) smallest = right;
+      if (smallest === idx) break;
+      [this.heap[smallest], this.heap[idx]] = [this.heap[idx], this.heap[smallest]];
+      idx = smallest;
+    }
   }
 }
 
@@ -59,23 +94,16 @@ export class DijkstraRouter {
         const weatherImpact = this.environment.getWeatherImpact(neighbor);
         const isFlooded = this.environment.isFlooded(neighbor);
 
-        // Realistic Consumption Multipliers
-        let consumptionMultiplier = 1.0;
-        if (vehicle.type === 'ev') consumptionMultiplier = 0.2;
-        if (vehicle.type === 'hybrid') consumptionMultiplier = 0.6;
-
         let edgeCost: number;
-        // Logic: Dijkstra now accepts 'Flooded' nodes but with a massive penalty, just like the AI.
         const floodPenalty = isFlooded ? 500 : 0;
-        const timeCost = edge.distance * 0.002 * trafficFactor * weatherImpact; // 30km/h scale
-        const fuelCost = edge.distance * 0.00025 * consumptionMultiplier * trafficFactor * weatherImpact; // 4km/L scale
+        const timeCost = calculateSegmentTime(edge, trafficFactor, weatherImpact);
+        const fuelCost = calculateSegmentFuel(edge, trafficFactor, weatherImpact, vehicle.type);
 
         if (constraints.priority === 'critical' || constraints.priority === 'high') {
           edgeCost = timeCost + floodPenalty;
         } else if (constraints.priority === 'low') {
           edgeCost = (fuelCost * 2) + floodPenalty;
         } else {
-          // Standard Balanced Baseline
           edgeCost = (fuelCost * 5) + (timeCost * 2) + floodPenalty;
         }
 
@@ -130,11 +158,8 @@ export class DijkstraRouter {
       const trafficFactor = this.environment.getTrafficFactor(from, to);
       const weatherImpact = this.environment.getWeatherImpact(to);
 
-      const baseFuelCost = edge.distance * 0.00025;
-      const elevationCost = Math.max(0, edge.elevation * 0.0001);
-      const segmentFuel = (baseFuelCost + elevationCost) * trafficFactor * weatherImpact;
-
-      const segmentTime = edge.distance * 0.002 * trafficFactor * weatherImpact;
+      const segmentFuel = calculateSegmentFuel(edge, trafficFactor, weatherImpact, vehicle.type);
+      const segmentTime = calculateSegmentTime(edge, trafficFactor, weatherImpact);
 
       totalFuel += segmentFuel;
       totalTime += segmentTime;
@@ -149,12 +174,7 @@ export class DijkstraRouter {
       });
     }
 
-    // Vehicle Specific CO2 calculation
-    let co2Factor = 2.31;
-    if (vehicle.type === 'ev') co2Factor = 0.4;
-    if (vehicle.type === 'hybrid') co2Factor = 1.2;
-
-    const co2Emissions = totalFuel * co2Factor;
+    const co2Emissions = calculateCO2(totalFuel, vehicle.type);
 
     return {
       path,

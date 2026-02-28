@@ -1,10 +1,8 @@
-import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Shield, Truck, Settings, Cloud } from 'lucide-react';
 
 export function LoginScreen() {
     const { login } = useAuth();
-    const [selectedCity, setSelectedCity] = useState('New York');
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 text-white p-6">
